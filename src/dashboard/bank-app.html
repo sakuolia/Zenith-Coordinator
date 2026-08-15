@@ -1,0 +1,1859 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light">
+<title>Zenith 銀行アプリ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Noto+Sans+JP:wght@400;500;700&family=Noto+Serif+JP:wght@500;700&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      fontFamily: {
+        sans: ['"Noto Sans JP"', 'Inter', 'ui-sans-serif', 'system-ui'],
+        serif: ['"Noto Serif JP"', 'ui-serif', 'Georgia'],
+        mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', '"Courier New"'],
+      },
+      colors: {
+        washi: '#F6F2E8',
+        'bd': '#E6E1D6',
+        ink: { 950:'#0A0F17', 900:'#0E1521', 700:'#3E4A5A', 500:'#5E6B7A', 300:'#8C97A3' },
+        zc: { 950:'#0A1A33', 900:'#0E2445', 800:'#14305C', 700:'#1C3E75' },
+        vml: { 700:'#B4382E', 600:'#C9473C' },
+        mat: { 700:'#1F5A3A', 600:'#2A6B45' },
+        gld: { 700:'#8A6A2B' },
+      },
+      boxShadow: {
+        soft: '0 1px 2px rgba(14,21,33,0.08)',
+        float: '0 8px 24px rgba(14,21,33,0.10)',
+      },
+    }
+  }
+}
+</script>
+<style>
+  :root { --sab: env(safe-area-inset-bottom, 0px); --sat: env(safe-area-inset-top, 0px); }
+  html, body { height: 100%; }
+  body {
+    background:
+      radial-gradient(900px 500px at 50% -30%, rgba(28,62,117,0.14) 0%, transparent 60%),
+      radial-gradient(700px 350px at 110% 15%, rgba(154,122,51,0.09) 0%, transparent 55%),
+      radial-gradient(600px 300px at -10% 20%, rgba(31,90,58,0.07) 0%, transparent 55%),
+      linear-gradient(180deg, #F6F2E8 0%, #F8F4EC 100%);
+    font-feature-settings: "tnum" 1, "lnum" 1;
+    color: #0E1521;
+  }
+  body::before {
+    content: "";
+    position: fixed; inset: 0;
+    pointer-events: none;
+    opacity: 0.09;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='220' height='220' filter='url(%23n)' opacity='.25'/%3E%3C/svg%3E");
+    background-size: 220px 220px;
+    mix-blend-mode: multiply;
+  }
+  @keyframes fadeIn  { from { opacity:0; transform:translateY(6px);  } to { opacity:1; transform:none; } }
+  @keyframes slideUp { from { opacity:0; transform:translateY(14px); } to { opacity:1; transform:none; } }
+  .fade-in  { animation: fadeIn  .22s ease; }
+  .slide-up { animation: slideUp .28s ease; }
+  [x-cloak] { display: none !important; }
+  .glass { background: rgba(255,255,255,0.82); backdrop-filter: blur(12px); border: 1px solid #E6E1D6; }
+  .glass-dark { background: rgba(255,255,255,0.65); backdrop-filter: blur(8px); border: 1px solid #E6E1D6; }
+  .chip { display: inline-flex; align-items: center; background: rgba(255,255,255,0.88); backdrop-filter: blur(8px); border: 1px solid #E6E1D6; border-radius: 999px; padding: 4px 10px; font-size: 11px; }
+  .pb-nav { padding-bottom: calc(var(--sab) + 76px); }
+  input, select { -webkit-appearance: none; appearance: none; outline: none; }
+  input:focus, select:focus { ring: none; }
+  /* Number input spinner hide */
+  input[type=number]::-webkit-inner-spin-button,
+  input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
+  .hide-scrollbar::-webkit-scrollbar { display: none; }
+  .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+</style>
+</head>
+<body class="font-sans min-h-screen">
+
+<div x-data="bankApp()" x-cloak class="min-h-screen flex flex-col">
+
+  <!-- ══════════════════════════════════
+       SCREEN: bankSelect
+  ══════════════════════════════════ -->
+  <template x-if="screen === 'bankSelect'">
+    <div class="min-h-screen flex flex-col">
+
+      <!-- Header -->
+      <div class="sticky top-0 z-20" style="padding-top:var(--sat)">
+        <div class="border-b border-[#002244]" style="background:#003366">
+          <div class="max-w-md mx-auto px-4 py-4 flex items-center gap-3 text-white">
+            <div class="w-10 h-10 rounded-[14px] bg-white/10 border border-white/15 flex items-center justify-center flex-shrink-0 shadow-soft">
+              <span class="text-[11px] font-semibold tracking-widest">ZC</span>
+            </div>
+            <div>
+              <div class="text-[10px] text-white/85 uppercase tracking-widest">Zenith Clearing Network</div>
+              <div class="text-[16px] font-semibold leading-tight mt-0.5">銀行を選択</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Body -->
+      <div class="flex-1 overflow-y-auto">
+        <div class="max-w-md mx-auto px-4 py-6 pb-12">
+          <div class="text-[11px] text-ink-500 uppercase tracking-wider mb-3">参加銀行一覧</div>
+
+          <template x-if="!banks.length">
+            <div class="rounded-3xl glass p-8 text-center">
+              <div class="w-8 h-8 border-2 border-ink-300 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
+              <div class="text-[13px] text-ink-500">読み込み中...</div>
+            </div>
+          </template>
+
+          <div class="space-y-2">
+            <template x-for="b in banks" :key="b.bank_id">
+              <button @click="selectBank(b.bank_id, b.bank_name)"
+                class="w-full rounded-3xl glass shadow-soft p-4 text-left hover:shadow-float hover:bg-white transition-all duration-200">
+                <div class="flex items-center justify-between gap-3">
+                  <div>
+                    <div class="text-[15px] font-semibold text-ink-900" x-text="b.bank_name || b.bank_id"></div>
+                    <div class="mt-0.5 text-[11px] text-ink-500 font-mono">銀行コード <span x-text="b.bank_id"></span></div>
+                  </div>
+                  <svg class="w-5 h-5 text-ink-300 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                    <path d="M9 18l6-6-6-6"/>
+                  </svg>
+                </div>
+              </button>
+            </template>
+          </div>
+        </div>
+      </div>
+    </div>
+  </template>
+
+  <!-- ══════════════════════════════════
+       SCREEN: accountSelect
+  ══════════════════════════════════ -->
+  <template x-if="screen === 'accountSelect'">
+    <div class="min-h-screen flex flex-col fade-in">
+
+      <!-- Header -->
+      <div class="sticky top-0 z-20" style="padding-top:var(--sat)">
+        <div class="border-b border-[#002244]" style="background:#003366">
+          <div class="max-w-md mx-auto px-4 py-3 flex items-center gap-3 text-white">
+            <button @click="screen = 'bankSelect'"
+              class="w-9 h-9 rounded-[12px] bg-white/10 border border-white/15 flex items-center justify-center flex-shrink-0">
+              <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                <path d="M15 18l-6-6 6-6"/>
+              </svg>
+            </button>
+            <div>
+              <div class="text-[11px] text-white/85" x-text="bankName"></div>
+              <div class="text-[16px] font-semibold leading-tight">口座を選択</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Body -->
+      <div class="flex-1 overflow-y-auto">
+        <div class="max-w-md mx-auto px-4 py-6 pb-12">
+          <template x-if="!accounts.length">
+            <div class="rounded-3xl glass p-8 text-center text-[13px] text-ink-500">口座が見つかりません</div>
+          </template>
+          <div class="space-y-2">
+            <template x-for="a in accounts" :key="a.account_id">
+              <button @click="selectAccount(a.account_id, a.customer_id, a.customer_name)"
+                class="w-full rounded-3xl glass shadow-soft p-4 text-left hover:shadow-float hover:bg-white transition-all duration-200">
+                <div class="flex items-center justify-between gap-3">
+                  <div class="min-w-0">
+                    <div class="text-[15px] font-semibold text-ink-900 truncate" x-text="a.customer_name || a.customer_id"></div>
+                    <div class="mt-1 font-mono text-[11px] text-ink-500" x-text="a.account_id"></div>
+                    <div class="mt-1.5">
+                      <span class="chip text-[10px] font-medium" style="color:#0E2445; background:rgba(14,36,69,0.07)" x-text="a.account_type"></span>
+                    </div>
+                  </div>
+                  <svg class="w-5 h-5 text-ink-300 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                    <path d="M9 18l6-6-6-6"/>
+                  </svg>
+                </div>
+              </button>
+            </template>
+          </div>
+        </div>
+      </div>
+    </div>
+  </template>
+
+  <!-- ══════════════════════════════════
+       SCREEN: main
+  ══════════════════════════════════ -->
+  <template x-if="screen === 'main'">
+    <div class="min-h-screen flex flex-col fade-in">
+
+      <!-- Header -->
+      <div class="sticky top-0 z-20" style="padding-top:var(--sat)">
+        <div class="border-b border-[#002244]" style="background:#003366">
+          <div class="max-w-md mx-auto px-4 py-3 flex items-center justify-between text-white">
+            <div class="flex items-center gap-3">
+              <button @click="screen = 'accountSelect'"
+                class="w-9 h-9 rounded-[12px] bg-white/10 border border-white/15 flex items-center justify-center flex-shrink-0">
+                <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                  <circle cx="12" cy="8" r="4"/>
+                  <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
+                </svg>
+              </button>
+              <div>
+                <div class="text-[11px] text-white/85 leading-tight" x-text="bankName"></div>
+                <div class="text-[14px] font-semibold leading-tight mt-0.5"
+                  x-text="({home:'ホーム',transfer:'振込・送金',history:'取引明細',approval:'承認受信箱',status:'送金状況',alias:'エイリアス送金',qr:'QRコード決済',request:'請求・受取'})[tab] || tab"></div>
+              </div>
+            </div>
+            <button @click="loadBalance()"
+              class="w-9 h-9 rounded-[12px] bg-white/10 border border-white/15 flex items-center justify-center">
+              <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                <path d="M1 4v6h6M23 20v-6h-6"/>
+                <path d="M20.5 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.5 15"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Scrollable body -->
+      <div class="flex-1 overflow-y-auto pb-nav">
+        <div class="max-w-md mx-auto px-4 py-4">
+
+          <!-- ── Balance card (always shown) ── -->
+          <div class="rounded-3xl glass shadow-float p-5 mb-4">
+            <div class="text-[11px] text-ink-500 uppercase tracking-wider">普通預金残高</div>
+            <div class="mt-2 text-[34px] font-semibold tracking-tight text-ink-950 font-serif"
+              x-text="balance !== null ? '¥\u2009' + Number(balance).toLocaleString('ja-JP') : '― ―'"></div>
+            <div class="mt-3 flex items-center justify-between">
+              <span class="chip text-ink-700 font-mono"
+                x-text="accountId ? accountId.slice(0,4)+'····'+accountId.slice(-4) : ''"></span>
+              <span class="text-[11px] text-ink-500">お引き出し可能額</span>
+            </div>
+          </div>
+
+          <!-- ━━━━━━━━━━ TAB: home ━━━━━━━━━━ -->
+          <template x-if="tab === 'home'">
+            <div class="slide-up">
+              <!-- Quick actions grid -->
+              <div class="grid grid-cols-2 gap-3 mb-4">
+                <button @click="tab = 'transfer'; transferStep = 1"
+                  class="rounded-3xl p-4 text-left transition-all hover:opacity-90"
+                  style="background: linear-gradient(135deg, #0E2445 0%, #1C3E75 100%)">
+                  <svg class="w-6 h-6 text-white/70 mb-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                    <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>
+                  </svg>
+                  <div class="text-[14px] font-semibold text-white">振込・送金</div>
+                  <div class="mt-0.5 text-[11px] text-white/85">宛先を指定して送金</div>
+                </button>
+                <button @click="tab = 'history'; loadHistory()"
+                  class="rounded-3xl glass-dark shadow-soft p-4 text-left hover:shadow-float hover:bg-white transition-all">
+                  <svg class="w-6 h-6 text-ink-500 mb-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                    <rect x="5" y="2" width="14" height="20" rx="2"/>
+                    <path d="M9 7h6M9 11h6M9 15h4"/>
+                  </svg>
+                  <div class="text-[14px] font-semibold text-ink-900">取引明細</div>
+                  <div class="mt-0.5 text-[11px] text-ink-500">入出金履歴</div>
+                </button>
+              </div>
+
+              <!-- Recent transactions -->
+              <div class="rounded-3xl glass-dark shadow-soft overflow-hidden">
+                <div class="px-4 py-3 flex items-center justify-between border-b border-bd">
+                  <div class="text-[13px] font-semibold text-ink-900">最近の取引</div>
+                  <button @click="tab = 'history'; loadHistory()"
+                    class="text-[12px] font-semibold text-zc-800 hover:underline">すべて</button>
+                </div>
+                <template x-if="!history.length">
+                  <div class="py-8 text-center text-[13px] text-ink-500">取引履歴はありません</div>
+                </template>
+                <div class="divide-y divide-bd">
+                  <template x-for="h in history.slice(0,5)" :key="h.journal_id">
+                    <div class="px-4 py-3.5 flex items-center justify-between gap-3">
+                      <div class="min-w-0">
+                        <div class="text-[13px] font-medium text-ink-900 truncate"
+                          x-text="h.label || '取引'"></div>
+                        <div class="mt-0.5 text-[11px] text-ink-400 truncate"
+                          x-text="h.counterparty || formatValueDate(h.value_date)"></div>
+                      </div>
+                      <div class="flex-shrink-0 text-right">
+                        <div class="text-[14px] font-semibold"
+                          :class="(h.amount||0) >= 0 ? 'text-mat-700' : 'text-vml-700'"
+                          x-text="((h.amount||0)>=0?'＋':'－')+'¥'+Math.abs(Number(h.amount||0)).toLocaleString('ja-JP')"></div>
+                        <div class="mt-0.5 text-[10px] text-ink-300"
+                          x-text="formatValueDate(h.value_date)"></div>
+                      </div>
+                    </div>
+                  </template>
+                </div>
+              </div>
+            </div>
+          </template>
+
+          <!-- ━━━━━━━━━━ TAB: transfer ━━━━━━━━━━ -->
+          <template x-if="tab === 'transfer'">
+            <div class="rounded-3xl glass shadow-float p-5 slide-up">
+
+              <!-- Step indicator -->
+              <div class="flex items-center mb-6">
+                <template x-for="(s, i) in ['振込先', '金額', '確認', '完了']" :key="i">
+                  <div class="flex items-center flex-1 min-w-0">
+                    <div class="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-semibold flex-shrink-0 transition-all duration-200"
+                      :style="transferStep > i+1 ? 'background:#1F5A3A; color:#fff' : transferStep === i+1 ? 'background:#0E2445; color:#fff' : 'background:#E6E1D6; color:#8C97A3'">
+                      <template x-if="transferStep > i+1"><i class="fa-solid fa-check text-[10px]"></i></template>
+                      <template x-if="transferStep <= i+1"><span x-text="i+1"></span></template>
+                    </div>
+                    <template x-if="i < 3">
+                      <div class="flex-1 h-0.5 mx-1 transition-colors duration-200"
+                        :style="transferStep > i+1 ? 'background:#1F5A3A' : 'background:#E6E1D6'"></div>
+                    </template>
+                  </div>
+                </template>
+              </div>
+
+              <!-- Step 1: 振込先 -->
+              <template x-if="transferStep === 1">
+                <div class="space-y-4 fade-in">
+                  <!-- Mode toggle: 口座番号 / エイリアス -->
+                  <div class="flex rounded-2xl border border-bd overflow-hidden">
+                    <button @click="aliasMode = false"
+                      class="flex-1 py-2.5 text-[12px] font-semibold transition-colors"
+                      :class="!aliasMode ? 'bg-zc-900 text-white' : 'bg-white/90 text-ink-500 hover:bg-white'">
+                      <i class="fa-solid fa-hashtag mr-1"></i>口座番号
+                    </button>
+                    <button @click="aliasMode = true"
+                      class="flex-1 py-2.5 text-[12px] font-semibold transition-colors"
+                      :class="aliasMode ? 'bg-zc-900 text-white' : 'bg-white/90 text-ink-500 hover:bg-white'">
+                      <i class="fa-solid fa-at mr-1"></i>エイリアス
+                    </button>
+                  </div>
+
+                  <!-- Account number mode -->
+                  <template x-if="!aliasMode">
+                    <div class="space-y-4">
+                      <div>
+                        <label class="block text-[11px] text-ink-500 uppercase tracking-wider mb-2">振込先口座番号</label>
+                        <input type="text" x-model="tf.payeeAccount" placeholder="口座番号（10桁）" maxlength="10"
+                          class="w-full rounded-2xl border border-bd bg-white/90 px-4 py-3 text-[14px] font-mono text-ink-900 focus:border-zc-700 focus:ring-2 focus:ring-zc-900/10 transition-colors placeholder:text-ink-300">
+                        <div class="mt-1.5 text-[11px] text-ink-400 pl-1" x-show="tf.payeeAccount.length >= 3"
+                          x-text="'銀行: ' + (banks.find(b => b.bank_id === tf.payeeAccount.slice(0,3))?.bank_name || tf.payeeAccount.slice(0,3))"></div>
+                      </div>
+                    </div>
+                  </template>
+
+                  <!-- Alias mode -->
+                  <template x-if="aliasMode">
+                    <div class="space-y-4">
+                      <div>
+                        <label class="block text-[11px] text-ink-500 uppercase tracking-wider mb-2">プロキシ種別</label>
+                        <div class="flex rounded-2xl border border-bd overflow-hidden">
+                          <button @click="proxyType = 'PHONE'"
+                            class="flex-1 py-2 text-[12px] font-medium transition-colors"
+                            :class="proxyType === 'PHONE' ? 'bg-zc-800 text-white' : 'bg-white/90 text-ink-500'">
+                            <i class="fa-solid fa-phone mr-1"></i>電話番号
+                          </button>
+                          <button @click="proxyType = 'EMAIL'"
+                            class="flex-1 py-2 text-[12px] font-medium transition-colors"
+                            :class="proxyType === 'EMAIL' ? 'bg-zc-800 text-white' : 'bg-white/90 text-ink-500'">
+                            <i class="fa-solid fa-envelope mr-1"></i>メール
+                          </button>
+                        </div>
+                      </div>
+                      <div>
+                        <label class="block text-[11px] text-ink-500 uppercase tracking-wider mb-2"
+                          x-text="proxyType === 'PHONE' ? '電話番号' : 'メールアドレス'"></label>
+                        <input type="text" x-model="proxyValue"
+                          :placeholder="proxyType === 'PHONE' ? '090-1234-5678' : 'user@example.com'"
+                          class="w-full rounded-2xl border border-bd bg-white/90 px-4 py-3 text-[14px] text-ink-900 focus:border-zc-700 focus:ring-2 focus:ring-zc-900/10 transition-colors placeholder:text-ink-300">
+                      </div>
+                      <button @click="resolveProxy()"
+                        :disabled="!proxyValue"
+                        class="w-full rounded-2xl border border-bd bg-white/90 py-3 text-[13px] font-medium text-zc-900 hover:bg-white transition-colors disabled:opacity-40">
+                        <i class="fa-solid fa-magnifying-glass mr-1"></i>エイリアスを解決
+                      </button>
+                      <template x-if="proxyResolved">
+                        <div class="rounded-2xl p-3.5" style="background:rgba(31,90,58,0.06); border:1px solid rgba(31,90,58,0.18)">
+                          <div class="text-[10px] text-mat-700 uppercase tracking-wider mb-0.5"><i class="fa-solid fa-circle-check mr-1"></i>解決済み</div>
+                          <div class="text-[14px] font-semibold text-mat-700" x-text="proxyResolved.name || proxyResolved.account_id"></div>
+                          <div class="mt-0.5 text-[11px] font-mono text-mat-600" x-text="proxyResolved.account_id"></div>
+                        </div>
+                      </template>
+                    </div>
+                  </template>
+
+                  <template x-if="tf.payeeName && !aliasMode">
+                    <div class="rounded-2xl p-3.5" style="background:rgba(31,90,58,0.06); border:1px solid rgba(31,90,58,0.18)">
+                      <div class="text-[10px] text-mat-700 uppercase tracking-wider mb-0.5"><i class="fa-solid fa-circle-check mr-1"></i>名義確認済み</div>
+                      <div class="text-[14px] font-semibold text-mat-700" x-text="tf.payeeName"></div>
+                    </div>
+                  </template>
+                  <template x-if="tf.payeeError">
+                    <div class="rounded-2xl p-3.5" style="background:rgba(180,56,46,0.06); border:1px solid rgba(180,56,46,0.18)">
+                      <div class="text-[13px] text-vml-700"><i class="fa-solid fa-circle-xmark mr-1"></i><span x-text="tf.payeeError"></span></div>
+                    </div>
+                  </template>
+                  <button x-show="!aliasMode" @click="verifyPayee()"
+                    class="w-full rounded-2xl border border-bd bg-white/90 py-3 text-[13px] font-medium text-zc-900 hover:bg-white transition-colors">
+                    名義を確認する
+                  </button>
+                  <button @click="transferStep = 2" :disabled="aliasMode ? !proxyResolved : tf.payeeAccount.length !== 10"
+                    class="w-full rounded-2xl py-3.5 text-[14px] font-semibold text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    style="background:#0E2445">
+                    次へ <i class="fa-solid fa-arrow-right ml-1"></i>
+                  </button>
+                </div>
+              </template>
+
+              <!-- Step 2: 金額 -->
+              <template x-if="transferStep === 2">
+                <div class="space-y-5 fade-in">
+                  <div>
+                    <label class="block text-[11px] text-ink-500 uppercase tracking-wider mb-2">振込金額</label>
+                    <div class="relative">
+                      <span class="absolute left-4 top-1/2 -translate-y-1/2 text-[16px] text-ink-400 font-serif">¥</span>
+                      <input type="number" x-model="tf.amount" min="1" placeholder="0"
+                        class="w-full rounded-2xl border border-bd bg-white/90 pl-9 pr-4 py-4 text-[22px] font-semibold text-ink-950 focus:border-zc-700 focus:ring-2 focus:ring-zc-900/10 transition-colors placeholder:text-ink-200">
+                    </div>
+                    <div class="mt-1.5 text-[12px] text-ink-500 pl-1" x-show="tf.amount > 0"
+                      x-text="Number(tf.amount).toLocaleString('ja-JP') + ' 円'"></div>
+                  </div>
+                  <div class="flex gap-2.5">
+                    <button @click="transferStep = 1"
+                      class="flex-1 rounded-2xl border border-bd bg-white/90 py-3 text-[13px] text-ink-700 hover:bg-white transition-colors">
+                      戻る
+                    </button>
+                    <button @click="transferStep = 3" :disabled="!tf.amount || parseInt(tf.amount) <= 0"
+                      class="flex-[2] rounded-2xl py-3 text-[14px] font-semibold text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                      style="background:#0E2445">
+                      次へ
+                    </button>
+                  </div>
+                </div>
+              </template>
+
+              <!-- Step 3: 確認 -->
+              <template x-if="transferStep === 3">
+                <div class="space-y-4 fade-in">
+                  <div class="rounded-2xl overflow-hidden border border-bd">
+                    <div class="px-4 py-3 flex items-center justify-between border-b border-bd bg-white/60">
+                      <span class="text-[11px] text-ink-500">振込先銀行</span>
+                      <span class="text-[13px] font-medium text-ink-900"
+                        x-text="banks.find(b=>b.bank_id===tf.payeeAccount.slice(0,3))?.bank_name || tf.payeeAccount.slice(0,3)"></span>
+                    </div>
+                    <div class="px-4 py-3 flex items-center justify-between border-b border-bd bg-white/60">
+                      <span class="text-[11px] text-ink-500">口座番号</span>
+                      <span class="text-[13px] font-mono text-ink-900" x-text="tf.payeeAccount"></span>
+                    </div>
+                    <template x-if="tf.payeeName">
+                      <div class="px-4 py-3 flex items-center justify-between border-b border-bd bg-white/60">
+                        <span class="text-[11px] text-ink-500">名義</span>
+                        <span class="text-[13px] font-semibold text-mat-700" x-text="tf.payeeName"></span>
+                      </div>
+                    </template>
+                    <div class="px-4 py-4 flex items-center justify-between bg-white/80">
+                      <span class="text-[12px] text-ink-500">振込金額</span>
+                      <span class="text-[22px] font-semibold font-serif" style="color:#0E2445"
+                        x-text="'¥\u2009'+Number(tf.amount).toLocaleString('ja-JP')"></span>
+                    </div>
+                  </div>
+                  <div class="rounded-2xl px-4 py-3 text-[11px] text-ink-500" style="background:rgba(14,36,69,0.04); border:1px solid rgba(14,36,69,0.10)">
+                    この操作は取り消しできません。内容を確認のうえ「送金する」を押してください。
+                  </div>
+                  <template x-if="tf.submitError">
+                    <div class="rounded-2xl p-3.5" style="background:rgba(180,56,46,0.08); border:1px solid rgba(180,56,46,0.25)">
+                      <div class="text-[11px] text-vml-700 font-semibold uppercase tracking-wider mb-0.5">送金エラー</div>
+                      <div class="text-[13px] text-vml-700" x-text="tf.submitError"></div>
+                    </div>
+                  </template>
+                  <div class="flex gap-2.5">
+                    <button @click="transferStep = 2"
+                      class="flex-1 rounded-2xl border border-bd bg-white/90 py-3 text-[13px] text-ink-700 hover:bg-white transition-colors">
+                      戻る
+                    </button>
+                    <button @click="submitTransfer()" :disabled="submitting"
+                      class="flex-[2] rounded-2xl py-3 text-[14px] font-semibold text-white transition-colors disabled:opacity-40"
+                      style="background:#0E2445">
+                      <span x-text="submitting ? '処理中...' : '送金する'"></span>
+                    </button>
+                  </div>
+                </div>
+              </template>
+
+              <!-- Step 4: 完了 -->
+              <template x-if="transferStep === 4">
+                <div class="text-center space-y-5 fade-in py-2">
+                  <div class="w-16 h-16 rounded-full mx-auto flex items-center justify-center"
+                    style="background:rgba(31,90,58,0.10)">
+                    <svg class="w-8 h-8 text-mat-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                      <circle cx="12" cy="12" r="9"/>
+                      <path d="M8.5 12.5l2.5 2.5 4.5-5"/>
+                    </svg>
+                  </div>
+                  <div>
+                    <div class="text-[17px] font-semibold text-ink-900">振込の受付が完了しました</div>
+                    <div class="mt-1 text-[13px] text-ink-500">ただいま振込処理を行っております</div>
+                  </div>
+                  <div class="rounded-2xl border border-bd bg-white/70 p-4 text-left">
+                    <div class="text-[10px] text-ink-400 uppercase tracking-wider mb-1.5">受付番号</div>
+                    <div class="font-mono text-[12px] text-ink-700 break-all" x-text="lastTxid"></div>
+                    <template x-if="txStatus">
+                      <div class="mt-3">
+                        <span class="chip text-[11px] font-semibold"
+                          :style="txStatus.state==='SETTLED' ? 'background:rgba(31,90,58,0.10);color:#1F5A3A;border-color:rgba(31,90,58,0.2)' : txStatus.state?.startsWith('FAIL')||txStatus.state==='CANCELLED' ? 'background:rgba(180,56,46,0.10);color:#B4382E;border-color:rgba(180,56,46,0.2)' : 'background:rgba(14,36,69,0.07);color:#0E2445;border-color:rgba(14,36,69,0.15)'"
+                          x-text="txStateLabel(txStatus.state)"></span>
+                      </div>
+                    </template>
+                  </div>
+                  <div class="flex gap-2.5">
+                    <button @click="checkStatus()"
+                      class="flex-1 rounded-2xl border border-bd bg-white/90 py-3 text-[13px] text-ink-700 hover:bg-white transition-colors">
+                      状況確認
+                    </button>
+                    <button @click="resetTransfer()"
+                      class="flex-1 rounded-2xl py-3 text-[13px] font-semibold text-white transition-colors"
+                      style="background:#0E2445">
+                      別の振込
+                    </button>
+                  </div>
+                </div>
+              </template>
+
+            </div>
+          </template>
+
+          <!-- ━━━━━━━━━━ TAB: history ━━━━━━━━━━ -->
+          <template x-if="tab === 'history'">
+            <div class="slide-up">
+              <!-- 明細一覧（詳細表示中は非表示） -->
+              <div x-show="!selectedTx" class="rounded-3xl glass-dark shadow-soft overflow-hidden">
+                <div class="px-4 py-3 flex items-center justify-between border-b border-bd">
+                  <div class="text-[13px] font-semibold text-ink-900">取引明細</div>
+                  <button @click="loadHistory()"
+                    class="w-8 h-8 rounded-xl border border-bd bg-white/90 flex items-center justify-center hover:bg-white transition-colors">
+                    <svg class="w-4 h-4 text-ink-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                      <path d="M1 4v6h6M23 20v-6h-6"/><path d="M20.5 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.5 15"/>
+                    </svg>
+                  </button>
+                </div>
+                <!-- 検索フィルター -->
+                <div class="px-4 py-3 border-b border-bd space-y-2.5" style="background:rgba(14,36,69,0.03)">
+                  <div class="flex gap-2">
+                    <div class="flex-1 min-w-0">
+                      <label class="block text-[10px] text-ink-400 uppercase tracking-wider mb-1">取引ID</label>
+                      <input type="text" x-model="histSearch.txid" placeholder="TX-..." @keyup.enter="loadHistory()"
+                        class="w-full rounded-xl border border-bd bg-white/90 px-3 py-1.5 text-[12px] font-mono text-ink-900 placeholder:text-ink-300 focus:border-zc-700 focus:ring-1 focus:ring-zc-900/10 transition-colors">
+                    </div>
+                  </div>
+                  <div class="flex gap-2">
+                    <div class="flex-1 min-w-0">
+                      <label class="block text-[10px] text-ink-400 uppercase tracking-wider mb-1">日付（From）</label>
+                      <input type="date" x-model="histSearch.dateFrom" @change="loadHistory()"
+                        class="w-full rounded-xl border border-bd bg-white/90 px-3 py-1.5 text-[12px] text-ink-900 focus:border-zc-700 focus:ring-1 focus:ring-zc-900/10 transition-colors">
+                    </div>
+                    <div class="flex-1 min-w-0">
+                      <label class="block text-[10px] text-ink-400 uppercase tracking-wider mb-1">日付（To）</label>
+                      <input type="date" x-model="histSearch.dateTo" @change="loadHistory()"
+                        class="w-full rounded-xl border border-bd bg-white/90 px-3 py-1.5 text-[12px] text-ink-900 focus:border-zc-700 focus:ring-1 focus:ring-zc-900/10 transition-colors">
+                    </div>
+                  </div>
+                  <div class="flex gap-2">
+                    <button @click="loadHistory()"
+                      class="flex-1 rounded-xl py-1.5 text-[12px] font-semibold text-white transition-colors"
+                      style="background:#0E2445">
+                      <i class="fa-solid fa-magnifying-glass mr-1"></i>検索
+                    </button>
+                    <button @click="histSearch={txid:'',dateFrom:'',dateTo:''}; loadHistory()"
+                      class="rounded-xl border border-bd bg-white/90 px-4 py-1.5 text-[12px] text-ink-500 hover:bg-white transition-colors">
+                      クリア
+                    </button>
+                  </div>
+                </div>
+                <template x-if="!history.length">
+                  <div class="py-12 text-center text-[13px] text-ink-500">取引履歴はありません</div>
+                </template>
+                <div class="divide-y divide-bd">
+                  <template x-for="h in history" :key="h.journal_id">
+                    <div class="px-4 py-3.5 flex items-start justify-between gap-3 cursor-pointer hover:bg-white/60 transition-colors"
+                      @click="h.txid && showTxDetail(h.txid)">
+                      <div class="min-w-0 flex-1">
+                        <div class="text-[13px] font-medium text-ink-900 truncate"
+                          x-text="h.label || '取引'"></div>
+                        <div class="mt-0.5 text-[12px] text-ink-600 truncate" x-show="h.counterparty"
+                          x-text="h.counterparty"></div>
+                        <div class="mt-0.5 text-[11px] text-ink-300"
+                          x-text="formatValueDate(h.value_date)"></div>
+                        <template x-if="h.tx_state && (h.tx_state === 'SUSPENDED' || h.tx_state === 'CANCELLED' || h.tx_state === 'FAIL_DEBIT' || h.tx_state === 'FAIL_CREDIT')">
+                          <div class="mt-1 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold"
+                            style="background:rgba(180,56,46,0.08);color:#B4382E;border:1px solid rgba(180,56,46,0.2)">
+                            <span x-text="h.tx_state"></span>
+                            <span x-show="h.suspend_reason" x-text="' — ' + h.suspend_reason"></span>
+                          </div>
+                        </template>
+                      </div>
+                      <div class="flex-shrink-0 text-right">
+                        <div class="text-[15px] font-semibold"
+                          :class="(h.amount||0) >= 0 ? 'text-mat-700' : 'text-vml-700'"
+                          x-text="((h.amount||0)>=0?'＋':'－')+'¥'+Math.abs(Number(h.amount||0)).toLocaleString('ja-JP')"></div>
+                        <div x-show="h.txid" class="mt-0.5 text-[10px] text-ink-300">詳細 →</div>
+                      </div>
+                    </div>
+                  </template>
+                </div>
+              </div>
+
+              <!-- TX 詳細パネル（明細タップ後に表示） -->
+              <template x-if="selectedTx">
+                <div class="rounded-3xl glass shadow-float p-5 slide-up">
+                  <div class="flex items-center justify-between mb-4">
+                    <div class="text-[13px] font-semibold text-ink-900">取引詳細</div>
+                    <button @click="selectedTx = null; txEvents = []"
+                      class="text-[11px] text-ink-400 hover:text-ink-700">← 一覧に戻る</button>
+                  </div>
+                  <div class="rounded-2xl border border-bd overflow-hidden mb-4">
+                    <div class="px-4 py-3 flex items-center justify-between border-b border-bd bg-white/60">
+                      <span class="text-[11px] text-ink-500">状態</span>
+                      <span class="text-[12px] font-semibold" :style="selectedTx.state==='SETTLED'?'color:#1F5A3A':selectedTx.state==='SUSPENDED'||selectedTx.state==='CANCELLED'?'color:#B4382E':'color:#0E2445'"
+                        x-text="txStateLabel(selectedTx.state)"></span>
+                    </div>
+                    <template x-if="selectedTx.reason_code">
+                      <div class="px-4 py-3 flex items-start gap-2 border-b border-bd" style="background:rgba(180,56,46,0.04)">
+                        <span class="text-[10px] font-semibold text-vml-700 uppercase tracking-wider mt-0.5 flex-shrink-0">停止理由</span>
+                        <span class="text-[12px] text-vml-700 font-medium" x-text="selectedTx.reason_code"></span>
+                      </div>
+                    </template>
+                    <div class="px-4 py-3 flex items-center justify-between border-b border-bd bg-white/60">
+                      <span class="text-[11px] text-ink-500">金額</span>
+                      <span class="text-[14px] font-semibold font-serif" style="color:#0E2445"
+                        x-text="'¥\u2009'+Number(selectedTx.amount_value||0).toLocaleString('ja-JP')"></span>
+                    </div>
+                    <div class="px-4 py-3 flex items-center justify-between border-b border-bd bg-white/60">
+                      <span class="text-[11px] text-ink-500">受付番号</span>
+                      <span class="font-mono text-[10px] text-ink-600" x-text="(selectedTx.txid||'').slice(0,24)+'…'"></span>
+                    </div>
+                    <div class="px-4 py-3 flex items-center justify-between border-b border-bd bg-white/60">
+                      <span class="text-[11px] text-ink-500">取引開始</span>
+                      <span class="font-mono text-[10px] text-ink-600" x-text="selectedTx.created_at ? new Date(selectedTx.created_at).toLocaleString('ja-JP', {year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',fractionalSecondDigits:3}) : '-'"></span>
+                    </div>
+                    <div class="px-4 py-3 flex items-center justify-between bg-white/60">
+                      <span class="text-[11px] text-ink-500">最終更新</span>
+                      <span class="font-mono text-[10px] text-ink-600" x-text="selectedTx.updated_at ? new Date(selectedTx.updated_at).toLocaleString('ja-JP', {year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',fractionalSecondDigits:3}) : '-'"></span>
+                    </div>
+                  </div>
+
+                  <!-- Event timeline -->
+                  <div class="text-[10px] text-ink-400 uppercase tracking-wider mb-3 font-semibold">処理タイムライン</div>
+                  <template x-if="!txEvents.length">
+                    <div class="text-[12px] text-ink-400 text-center py-4">イベントデータなし</div>
+                  </template>
+                  <div class="space-y-3">
+                    <template x-for="(ev, i) in txEvents" :key="i">
+                      <div class="flex gap-2.5">
+                        <div class="flex flex-col items-center flex-shrink-0">
+                          <div class="w-6 h-6 rounded-full border-2 flex items-center justify-center text-[10px] font-bold flex-shrink-0"
+                            :style="ev.status==='OK' ? 'background:rgba(31,90,58,0.10);border-color:rgba(31,90,58,0.3);color:#1F5A3A' : ev.status==='FAILED' ? 'background:rgba(180,56,46,0.10);border-color:rgba(180,56,46,0.3);color:#B4382E' : 'background:rgba(138,106,43,0.10);border-color:rgba(138,106,43,0.3);color:#8A6A2B'">
+                            <template x-if="ev.status==='OK'"><i class="fa-solid fa-check text-[9px]"></i></template>
+                            <template x-if="ev.status==='FAILED'"><i class="fa-solid fa-xmark text-[9px]"></i></template>
+                            <template x-if="ev.status!=='OK' && ev.status!=='FAILED'"><i class="fa-solid fa-circle text-[6px]"></i></template>
+                          </div>
+                          <div x-show="i < txEvents.length-1" class="w-0.5 flex-1 mt-1" style="background:#E6E1D6; min-height:12px"></div>
+                        </div>
+                        <div class="flex-1 pb-2">
+                          <div class="flex items-start justify-between gap-1">
+                            <div class="text-[12px] font-medium text-ink-900" x-text="ev.action || ev.event_type || '-'"></div>
+                            <div class="text-[10px] text-ink-300 flex-shrink-0" x-text="ev.duration_ms !== null && ev.duration_ms !== undefined ? ev.duration_ms+'ms' : ''"></div>
+                          </div>
+                          <!-- 状態遷移（FinalityLog イベント） -->
+                          <template x-if="ev.state_to">
+                            <div class="mt-0.5 flex items-center gap-1 flex-wrap">
+                              <template x-if="ev.state_from">
+                                <span class="text-[10px] text-ink-400 font-mono" x-text="ev.state_from"></span>
+                              </template>
+                              <template x-if="ev.state_from">
+                                <span class="text-[9px] text-ink-300">→</span>
+                              </template>
+                              <span class="text-[10px] font-semibold font-mono" style="color:#003366" x-text="ev.state_to"></span>
+                            </div>
+                          </template>
+                          <div x-show="ev.reason_code" class="mt-0.5 text-[10px] font-semibold uppercase text-vml-700" x-text="ev.reason_code"></div>
+                          <div class="text-[10px] text-ink-400 mt-0.5" x-text="ev.created_at ? new Date(ev.created_at).toLocaleTimeString('ja-JP', {hour:'2-digit',minute:'2-digit',second:'2-digit',fractionalSecondDigits:3}) + ' ' + new Date(ev.created_at).toLocaleDateString('ja-JP') : ''"></div>
+                        </div>
+                      </div>
+                    </template>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </template>
+
+          <!-- ━━━━━━━━━━ TAB: approval ━━━━━━━━━━ -->
+          <template x-if="tab === 'approval'">
+            <div class="slide-up">
+
+              <!-- Pending approvals list -->
+              <div class="rounded-3xl glass-dark shadow-soft overflow-hidden mb-4">
+                <div class="px-4 py-3 flex items-center justify-between border-b border-bd">
+                  <div class="text-[13px] font-semibold text-ink-900">着金承認待ち</div>
+                  <button @click="loadApprovals()"
+                    class="w-8 h-8 rounded-xl border border-bd bg-white/90 flex items-center justify-center hover:bg-white transition-colors">
+                    <svg class="w-4 h-4 text-ink-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                      <path d="M1 4v6h6M23 20v-6h-6"/><path d="M20.5 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.5 15"/>
+                    </svg>
+                  </button>
+                </div>
+
+                <template x-if="!approvals.length">
+                  <div class="py-12 text-center">
+                    <div class="w-12 h-12 rounded-full mx-auto mb-3 flex items-center justify-center"
+                      style="background:rgba(31,90,58,0.08)">
+                      <svg class="w-6 h-6 text-mat-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                        <path d="M20 6L9 17l-5-5"/>
+                      </svg>
+                    </div>
+                    <div class="text-[13px] text-ink-500">承認待ちの入金はありません</div>
+                  </div>
+                </template>
+
+                <div class="divide-y divide-bd">
+                  <template x-for="ap in approvals" :key="ap.approval_id">
+                    <div class="px-4 py-4 fade-in">
+                      <div class="flex items-start justify-between gap-3 mb-3">
+                        <div class="min-w-0">
+                          <div class="text-[12px] font-semibold text-ink-900">入金承認リクエスト</div>
+                          <div class="mt-0.5 font-mono text-[10px] text-ink-400 truncate" x-text="ap.approval_id"></div>
+                        </div>
+                        <div class="flex-shrink-0 text-right">
+                          <div class="text-[16px] font-semibold font-serif text-mat-700"
+                            x-text="'¥\u2009' + Number(ap.amount_value||0).toLocaleString('ja-JP')"></div>
+                        </div>
+                      </div>
+
+                      <div class="rounded-2xl overflow-hidden border border-bd mb-3">
+                        <div class="px-3 py-2 flex items-center justify-between border-b border-bd bg-white/60">
+                          <span class="text-[10px] text-ink-400">送金元</span>
+                          <span class="text-[11px] font-mono text-ink-700" x-text="ap.sender_bank_id + ' / ' + (ap.sender_account_hash||'').slice(0,8)+'…'"></span>
+                        </div>
+                        <div class="px-3 py-2 flex items-center justify-between border-b border-bd bg-white/60">
+                          <span class="text-[10px] text-ink-400">フィルタ理由</span>
+                          <span class="text-[10px] font-semibold uppercase"
+                            style="color:#8A6A2B" x-text="ap.filter_type || '-'"></span>
+                        </div>
+                        <div class="px-3 py-2 flex items-center justify-between bg-white/60">
+                          <span class="text-[10px] text-ink-400">有効期限</span>
+                          <span class="text-[10px] text-ink-500" x-text="ap.expires_at ? new Date(ap.expires_at).toLocaleString('ja-JP') : '-'"></span>
+                        </div>
+                      </div>
+
+                      <div class="flex gap-2">
+                        <button @click="respondApproval(ap.approval_id, false)"
+                          :disabled="approvalLoading === ap.approval_id"
+                          class="flex-1 rounded-2xl py-2.5 text-[13px] font-semibold border border-bd text-vml-700 hover:bg-red-50 hover:border-red-200 transition-colors disabled:opacity-40">
+                          拒否
+                        </button>
+                        <button @click="respondApproval(ap.approval_id, true)"
+                          :disabled="approvalLoading === ap.approval_id"
+                          class="flex-[2] rounded-2xl py-2.5 text-[13px] font-semibold text-white transition-colors disabled:opacity-40"
+                          style="background:#1F5A3A">
+                          <span x-text="approvalLoading === ap.approval_id ? '処理中...' : '承認する'"></span>
+                        </button>
+                      </div>
+                    </div>
+                  </template>
+                </div>
+              </div>
+
+            </div>
+          </template>
+
+          <!-- ━━━━━━━━━━ TAB: status ━━━━━━━━━━ -->
+          <template x-if="tab === 'status'">
+            <div class="slide-up">
+              <div class="rounded-3xl glass-dark shadow-soft p-5">
+                <div class="text-[13px] font-semibold text-ink-900 mb-4">送金状況確認</div>
+                <template x-if="!lastTxid">
+                  <div class="py-10 text-center text-[13px] text-ink-500">確認できる送金がありません</div>
+                </template>
+                <template x-if="lastTxid">
+                  <div class="space-y-4">
+                    <div class="rounded-2xl border border-bd bg-white/70 p-4">
+                      <div class="text-[10px] text-ink-400 uppercase tracking-wider mb-1.5">受付番号</div>
+                      <div class="font-mono text-[12px] text-ink-700 break-all" x-text="lastTxid"></div>
+                    </div>
+                    <button @click="checkStatus()"
+                      class="w-full rounded-2xl border border-bd bg-white/90 py-3 text-[13px] font-medium text-zc-900 hover:bg-white transition-colors">
+                      状況を更新する
+                    </button>
+                    <template x-if="txStatus">
+                      <div class="rounded-2xl border border-bd overflow-hidden">
+                        <div class="px-4 py-3.5 flex items-center justify-between bg-white/60 border-b border-bd">
+                          <span class="text-[11px] text-ink-500">お取扱状況</span>
+                          <span class="chip text-[11px] font-semibold"
+                            :style="txStatus.state==='SETTLED' ? 'background:rgba(31,90,58,0.10);color:#1F5A3A;border-color:rgba(31,90,58,0.2)' : txStatus.state?.startsWith('FAIL')||txStatus.state==='CANCELLED' ? 'background:rgba(180,56,46,0.10);color:#B4382E;border-color:rgba(180,56,46,0.2)' : 'background:rgba(14,36,69,0.07);color:#0E2445;border-color:rgba(14,36,69,0.15)'"
+                            x-text="txStateLabel(txStatus.state)"></span>
+                        </div>
+                        <div class="px-4 py-3.5 flex items-center justify-between bg-white/60 border-b border-bd" x-show="txStatus.lane">
+                          <span class="text-[11px] text-ink-500">レーン</span>
+                          <span class="text-[13px] font-medium text-ink-900" x-text="txStatus.lane"></span>
+                        </div>
+                        <div class="px-4 py-3.5 flex items-center justify-between bg-white/60" x-show="txStatus.amount_value">
+                          <span class="text-[11px] text-ink-500">金額</span>
+                          <span class="text-[15px] font-semibold font-serif" style="color:#0E2445"
+                            x-text="'¥\u2009'+Number(txStatus.amount_value||0).toLocaleString('ja-JP')"></span>
+                        </div>
+                      </div>
+                    </template>
+                  </div>
+                </template>
+              </div>
+            </div>
+          </template>
+
+          <!-- ━━━━━━━━━━ TAB: alias ━━━━━━━━━━ -->
+          <template x-if="tab === 'alias'">
+            <div class="slide-up space-y-4">
+              <!-- Sub-tab selector -->
+              <div class="flex rounded-2xl border border-bd overflow-hidden">
+                <button @click="aliasSubTab = 'send'"
+                  class="flex-1 py-2.5 text-[12px] font-semibold transition-colors"
+                  :class="aliasSubTab === 'send' ? 'bg-zc-900 text-white' : 'bg-white/90 text-ink-500 hover:bg-white'">
+                  <i class="fa-solid fa-paper-plane mr-1"></i>エイリアス送金
+                </button>
+                <button @click="aliasSubTab = 'register'"
+                  class="flex-1 py-2.5 text-[12px] font-semibold transition-colors"
+                  :class="aliasSubTab === 'register' ? 'bg-zc-900 text-white' : 'bg-white/90 text-ink-500 hover:bg-white'">
+                  <i class="fa-solid fa-plus mr-1"></i>エイリアス登録
+                </button>
+              </div>
+
+              <!-- Send Alias Transfer -->
+              <template x-if="aliasSubTab === 'send'">
+                <div class="rounded-3xl glass shadow-float p-5 fade-in">
+                  <div class="text-[13px] font-semibold text-ink-900 mb-4"><i class="fa-solid fa-at mr-1.5 text-zc-800"></i>エイリアス送金</div>
+
+                  <!-- Proxy type selector -->
+                  <div class="mb-4">
+                    <label class="block text-[11px] text-ink-500 uppercase tracking-wider mb-2">プロキシ種別</label>
+                    <div class="flex rounded-2xl border border-bd overflow-hidden">
+                      <button @click="proxyType = 'PHONE'"
+                        class="flex-1 py-2.5 text-[12px] font-semibold transition-colors"
+                        :class="proxyType === 'PHONE' ? 'bg-zc-900 text-white' : 'bg-white/90 text-ink-500'">
+                        <i class="fa-solid fa-phone mr-1"></i>電話番号
+                      </button>
+                      <button @click="proxyType = 'EMAIL'"
+                        class="flex-1 py-2.5 text-[12px] font-semibold transition-colors"
+                        :class="proxyType === 'EMAIL' ? 'bg-zc-900 text-white' : 'bg-white/90 text-ink-500'">
+                        <i class="fa-solid fa-envelope mr-1"></i>メール
+                      </button>
+                    </div>
+                  </div>
+
+                  <!-- Alias input -->
+                  <div class="mb-4">
+                    <label class="block text-[11px] text-ink-500 uppercase tracking-wider mb-2"
+                      x-text="proxyType === 'PHONE' ? '電話番号' : 'メールアドレス'"></label>
+                    <input type="text" x-model="proxyValue"
+                      :placeholder="proxyType === 'PHONE' ? '090-1234-5678' : 'user@example.com'"
+                      class="w-full rounded-2xl border border-bd bg-white/90 px-4 py-3 text-[14px] text-ink-900 focus:border-zc-700 focus:ring-2 focus:ring-zc-900/10 transition-colors placeholder:text-ink-300">
+                  </div>
+
+                  <button @click="resolveProxy()"
+                    :disabled="!proxyValue"
+                    class="w-full rounded-2xl border border-bd bg-white/90 py-3 text-[13px] font-medium text-zc-900 hover:bg-white transition-colors disabled:opacity-40 mb-4">
+                    <i class="fa-solid fa-magnifying-glass mr-1"></i>エイリアスを解決
+                  </button>
+
+                  <!-- Resolution result -->
+                  <template x-if="proxyResolved">
+                    <div class="space-y-4">
+                      <div class="rounded-2xl p-3.5" style="background:rgba(31,90,58,0.06); border:1px solid rgba(31,90,58,0.18)">
+                        <div class="text-[10px] text-mat-700 uppercase tracking-wider mb-0.5"><i class="fa-solid fa-circle-check mr-1"></i>解決済み</div>
+                        <div class="text-[14px] font-semibold text-mat-700" x-text="proxyResolved.name || proxyResolved.customer_name || '-'"></div>
+                        <div class="mt-0.5 text-[11px] font-mono text-mat-600" x-text="proxyResolved.account_id"></div>
+                      </div>
+
+                      <!-- Amount -->
+                      <div>
+                        <label class="block text-[11px] text-ink-500 uppercase tracking-wider mb-2">送金金額</label>
+                        <div class="relative">
+                          <span class="absolute left-4 top-1/2 -translate-y-1/2 text-[16px] text-ink-400 font-serif">¥</span>
+                          <input type="number" x-model="aliasAmount" min="1" placeholder="0"
+                            class="w-full rounded-2xl border border-bd bg-white/90 pl-9 pr-4 py-4 text-[22px] font-semibold text-ink-950 focus:border-zc-700 focus:ring-2 focus:ring-zc-900/10 transition-colors placeholder:text-ink-200">
+                        </div>
+                      </div>
+
+                      <button @click="sendAliasTransfer()"
+                        :disabled="!aliasAmount || parseInt(aliasAmount) <= 0 || submitting"
+                        class="w-full rounded-2xl py-3.5 text-[14px] font-semibold text-white transition-colors disabled:opacity-40"
+                        style="background:#0E2445">
+                        <span x-text="submitting ? '処理中...' : 'エイリアス送金する'"></span> <i class="fa-solid fa-paper-plane ml-1"></i>
+                      </button>
+                    </div>
+                  </template>
+
+                  <template x-if="aliasResult">
+                    <div class="mt-4 rounded-2xl p-4 text-center" style="background:rgba(31,90,58,0.06); border:1px solid rgba(31,90,58,0.18)">
+                      <i class="fa-solid fa-circle-check text-mat-700 text-[24px] mb-2"></i>
+                      <div class="text-[14px] font-semibold text-mat-700">送金を受け付けました</div>
+                      <div class="mt-1 text-[11px] font-mono text-ink-500" x-text="aliasResult.txid"></div>
+                    </div>
+                  </template>
+
+                  <template x-if="aliasError">
+                    <div class="mt-4 rounded-2xl p-3.5" style="background:rgba(180,56,46,0.06); border:1px solid rgba(180,56,46,0.18)">
+                      <div class="text-[13px] text-vml-700"><i class="fa-solid fa-circle-xmark mr-1"></i><span x-text="aliasError"></span></div>
+                    </div>
+                  </template>
+                </div>
+              </template>
+
+              <!-- Register Alias -->
+              <template x-if="aliasSubTab === 'register'">
+                <div class="rounded-3xl glass shadow-float p-5 fade-in">
+                  <div class="text-[13px] font-semibold text-ink-900 mb-4"><i class="fa-solid fa-plus mr-1.5 text-zc-800"></i>エイリアス登録</div>
+
+                  <div class="mb-4">
+                    <label class="block text-[11px] text-ink-500 uppercase tracking-wider mb-2">プロキシ種別</label>
+                    <div class="flex rounded-2xl border border-bd overflow-hidden">
+                      <button @click="regProxyType = 'PHONE'"
+                        class="flex-1 py-2.5 text-[12px] font-semibold transition-colors"
+                        :class="regProxyType === 'PHONE' ? 'bg-zc-900 text-white' : 'bg-white/90 text-ink-500'">
+                        <i class="fa-solid fa-phone mr-1"></i>電話番号
+                      </button>
+                      <button @click="regProxyType = 'EMAIL'"
+                        class="flex-1 py-2.5 text-[12px] font-semibold transition-colors"
+                        :class="regProxyType === 'EMAIL' ? 'bg-zc-900 text-white' : 'bg-white/90 text-ink-500'">
+                        <i class="fa-solid fa-envelope mr-1"></i>メール
+                      </button>
+                    </div>
+                  </div>
+
+                  <div class="mb-4">
+                    <label class="block text-[11px] text-ink-500 uppercase tracking-wider mb-2"
+                      x-text="regProxyType === 'PHONE' ? '電話番号' : 'メールアドレス'"></label>
+                    <input type="text" x-model="regProxyValue"
+                      :placeholder="regProxyType === 'PHONE' ? '090-1234-5678' : 'user@example.com'"
+                      class="w-full rounded-2xl border border-bd bg-white/90 px-4 py-3 text-[14px] text-ink-900 focus:border-zc-700 focus:ring-2 focus:ring-zc-900/10 transition-colors placeholder:text-ink-300">
+                  </div>
+
+                  <div class="mb-4">
+                    <label class="block text-[11px] text-ink-500 uppercase tracking-wider mb-2">紐付ける口座</label>
+                    <div class="w-full rounded-2xl border border-bd bg-white/90 px-4 py-3 text-[14px] text-ink-900 cursor-not-allowed opacity-80" x-text="accountId"></div>
+                  </div>
+
+                  <button @click="registerProxy()"
+                    :disabled="!regProxyValue || submitting"
+                    class="w-full rounded-2xl py-3.5 text-[14px] font-semibold text-white transition-colors disabled:opacity-40"
+                    style="background:#0E2445">
+                    <span x-text="submitting ? '処理中...' : '登録する'"></span> <i class="fa-solid fa-check ml-1"></i>
+                  </button>
+
+                  <template x-if="regProxyResult">
+                    <div class="mt-4 rounded-2xl p-4 text-center" style="background:rgba(31,90,58,0.06); border:1px solid rgba(31,90,58,0.18)">
+                      <i class="fa-solid fa-circle-check text-mat-700 text-[24px] mb-2"></i>
+                      <div class="text-[14px] font-semibold text-mat-700">登録が完了しました</div>
+                      <div class="mt-1 text-[11px] font-mono text-ink-500" x-text="regProxyValue"></div>
+                    </div>
+                  </template>
+
+                  <template x-if="regProxyError">
+                    <div class="mt-4 rounded-2xl p-3.5" style="background:rgba(180,56,46,0.06); border:1px solid rgba(180,56,46,0.18)">
+                      <div class="text-[13px] text-vml-700"><i class="fa-solid fa-circle-xmark mr-1"></i><span x-text="regProxyError"></span></div>
+                    </div>
+                  </template>
+                </div>
+              </template>
+            </div>
+          </template>
+
+          <!-- ━━━━━━━━━━ TAB: qr ━━━━━━━━━━ -->
+          <template x-if="tab === 'qr'">
+            <div class="slide-up space-y-4">
+              <!-- Sub-tab selector -->
+              <div class="flex rounded-2xl border border-bd overflow-hidden">
+                <button @click="qrSubTab = 'generate'"
+                  class="flex-1 py-2.5 text-[12px] font-semibold transition-colors"
+                  :class="qrSubTab === 'generate' ? 'bg-zc-900 text-white' : 'bg-white/90 text-ink-500 hover:bg-white'">
+                  <i class="fa-solid fa-qrcode mr-1"></i>受取QR生成
+                </button>
+                <button @click="qrSubTab = 'pay'"
+                  class="flex-1 py-2.5 text-[12px] font-semibold transition-colors"
+                  :class="qrSubTab === 'pay' ? 'bg-zc-900 text-white' : 'bg-white/90 text-ink-500 hover:bg-white'">
+                  <i class="fa-solid fa-camera mr-1"></i>QR支払
+                </button>
+              </div>
+
+              <!-- Generate QR -->
+              <template x-if="qrSubTab === 'generate'">
+                <div class="rounded-3xl glass shadow-float p-5 fade-in">
+                  <div class="text-[13px] font-semibold text-ink-900 mb-4"><i class="fa-solid fa-qrcode mr-1.5 text-zc-800"></i>受取QRコード生成</div>
+                  <div class="space-y-4">
+                    <div>
+                      <label class="block text-[11px] text-ink-500 uppercase tracking-wider mb-2">金額（任意）</label>
+                      <div class="relative">
+                        <span class="absolute left-4 top-1/2 -translate-y-1/2 text-[16px] text-ink-400 font-serif">¥</span>
+                        <input type="number" x-model="qrAmount" min="0" placeholder="金額指定なし"
+                          class="w-full rounded-2xl border border-bd bg-white/90 pl-9 pr-4 py-3 text-[16px] font-semibold text-ink-950 focus:border-zc-700 focus:ring-2 focus:ring-zc-900/10 transition-colors placeholder:text-ink-300">
+                      </div>
+                    </div>
+                    <div>
+                      <label class="block text-[11px] text-ink-500 uppercase tracking-wider mb-2">メモ（任意）</label>
+                      <input type="text" x-model="qrMemo" placeholder="お支払いメモ"
+                        class="w-full rounded-2xl border border-bd bg-white/90 px-4 py-3 text-[14px] text-ink-900 focus:border-zc-700 focus:ring-2 focus:ring-zc-900/10 transition-colors placeholder:text-ink-300">
+                    </div>
+                    <button @click="generateQr()"
+                      :disabled="submitting"
+                      class="w-full rounded-2xl py-3.5 text-[14px] font-semibold text-white transition-colors disabled:opacity-40"
+                      style="background:#0E2445">
+                      <span x-text="submitting ? '生成中...' : 'QRコードを生成'"></span>
+                    </button>
+                    <template x-if="qrResult">
+                      <div class="rounded-2xl border border-bd bg-white/80 p-5 text-center">
+                        <div class="flex justify-center mb-3">
+                          <div x-ref="qrDiv"
+                            x-init="$nextTick(() => new QRCode($refs.qrDiv, { text: qrResult.qr_ref, width: 192, height: 192, correctLevel: QRCode.CorrectLevel.M }))"
+                            class="rounded-xl border border-bd overflow-hidden"></div>
+                        </div>
+                        <div class="text-[11px] text-ink-500 mb-1">リファレンスコード (手入力用)</div>
+                        <div class="text-[14px] font-mono font-semibold text-zc-900 break-all bg-white/50 p-2 rounded selectable" style="user-select: all;" x-text="qrResult.qr_ref || qrResult.reference"></div>
+                        <template x-if="qrAmount > 0">
+                          <div class="mt-2 text-[16px] font-semibold font-serif" style="color:#0E2445"
+                            x-text="'¥\u2009' + Number(qrAmount).toLocaleString('ja-JP')"></div>
+                        </template>
+                      </div>
+                    </template>
+                  </div>
+                </div>
+              </template>
+
+              <!-- Pay with QR -->
+              <template x-if="qrSubTab === 'pay'">
+                <div class="rounded-3xl glass shadow-float p-5 fade-in">
+                  <div class="text-[13px] font-semibold text-ink-900 mb-4"><i class="fa-solid fa-camera mr-1.5 text-zc-800"></i>QR支払</div>
+                  <div class="space-y-4">
+                    <!-- Camera scan button -->
+                    <div>
+                      <button @click="qrCameraActive ? stopQrCamera() : startQrCamera()"
+                        class="w-full rounded-2xl py-3 text-[13px] font-semibold transition-colors border"
+                        :class="qrCameraActive ? 'bg-vml-700 text-white border-vml-700' : 'bg-white/90 text-zc-900 border-bd'">
+                        <i class="fa-solid mr-1.5" :class="qrCameraActive ? 'fa-stop' : 'fa-camera'"></i>
+                        <span x-text="qrCameraActive ? 'カメラを停止' : 'カメラでスキャン'"></span>
+                      </button>
+                      <template x-if="qrCameraActive">
+                        <div class="relative mt-3 rounded-2xl overflow-hidden bg-black" style="aspect-ratio:1">
+                          <video x-ref="qrVideo" autoplay playsinline muted class="w-full h-full object-cover"></video>
+                          <canvas x-ref="qrCanvas" class="hidden"></canvas>
+                          <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
+                            <div class="w-48 h-48 border-2 border-white/80 rounded-xl" style="box-shadow:0 0 0 9999px rgba(0,0,0,0.45)"></div>
+                          </div>
+                          <div class="absolute bottom-3 w-full text-center text-[12px] text-white/80">QRコードを枠内に合わせてください</div>
+                        </div>
+                      </template>
+                    </div>
+                    <!-- Manual input -->
+                    <div>
+                      <label class="block text-[11px] text-ink-500 uppercase tracking-wider mb-2">リファレンスコード</label>
+                      <input type="text" x-model="qrPayRef" placeholder="またはリファレンスコードを手入力"
+                        class="w-full rounded-2xl border border-bd bg-white/90 px-4 py-3 text-[14px] font-mono text-ink-900 focus:border-zc-700 focus:ring-2 focus:ring-zc-900/10 transition-colors placeholder:text-ink-300">
+                    </div>
+                    <!-- Amount input for open-amount QR -->
+                    <div>
+                      <label class="block text-[11px] text-ink-500 uppercase tracking-wider mb-2">金額（QRに金額が含まれない場合）</label>
+                      <div class="relative">
+                        <span class="absolute left-4 top-1/2 -translate-y-1/2 text-[16px] text-ink-400 font-serif">¥</span>
+                        <input type="number" x-model="qrPayAmount" min="1" placeholder="金額指定なし"
+                          class="w-full rounded-2xl border border-bd bg-white/90 pl-9 pr-4 py-3 text-[16px] font-semibold text-ink-950 focus:border-zc-700 focus:ring-2 focus:ring-zc-900/10 transition-colors placeholder:text-ink-300">
+                      </div>
+                    </div>
+                    <button @click="payQr()"
+                      :disabled="!qrPayRef || submitting"
+                      class="w-full rounded-2xl py-3.5 text-[14px] font-semibold text-white transition-colors disabled:opacity-40"
+                      style="background:#0E2445">
+                      <span x-text="submitting ? '処理中...' : 'QR支払を実行'"></span>
+                    </button>
+                    <template x-if="qrPayResult">
+                      <div class="rounded-2xl p-4 text-center" style="background:rgba(31,90,58,0.06); border:1px solid rgba(31,90,58,0.18)">
+                        <i class="fa-solid fa-circle-check text-mat-700 text-[24px] mb-2"></i>
+                        <div class="text-[14px] font-semibold text-mat-700">QR支払が完了しました</div>
+                        <div class="mt-1 text-[11px] font-mono text-ink-500" x-text="qrPayResult.txid"></div>
+                      </div>
+                    </template>
+                    <template x-if="qrPayError">
+                      <div class="rounded-2xl p-3.5" style="background:rgba(180,56,46,0.06); border:1px solid rgba(180,56,46,0.18)">
+                        <div class="text-[13px] text-vml-700"><i class="fa-solid fa-circle-xmark mr-1"></i><span x-text="qrPayError"></span></div>
+                      </div>
+                    </template>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </template>
+
+          <!-- ━━━━━━━━━━ TAB: request (RTP) ━━━━━━━━━━ -->
+          <template x-if="tab === 'request'">
+            <div class="slide-up space-y-4">
+              <!-- Sub-tab selector -->
+              <div class="flex rounded-2xl border border-bd overflow-hidden">
+                <button @click="rtpSubTab = 'send'"
+                  class="flex-1 py-2.5 text-[12px] font-semibold transition-colors"
+                  :class="rtpSubTab === 'send' ? 'bg-zc-900 text-white' : 'bg-white/90 text-ink-500 hover:bg-white'">
+                  <i class="fa-solid fa-paper-plane mr-1"></i>請求送信
+                </button>
+                <button @click="rtpSubTab = 'inbox'; loadIncomingRequests()"
+                  class="flex-1 py-2.5 text-[12px] font-semibold transition-colors"
+                  :class="rtpSubTab === 'inbox' ? 'bg-zc-900 text-white' : 'bg-white/90 text-ink-500 hover:bg-white'">
+                  <i class="fa-solid fa-inbox mr-1"></i>受信請求
+                  <template x-if="incomingRequests.length > 0">
+                    <span class="ml-1 inline-flex items-center justify-center w-5 h-5 rounded-full bg-vml-600 text-white text-[9px] font-bold"
+                      x-text="incomingRequests.length"></span>
+                  </template>
+                </button>
+              </div>
+
+              <!-- Send request -->
+              <template x-if="rtpSubTab === 'send'">
+                <div class="rounded-3xl glass shadow-float p-5 fade-in">
+                  <div class="text-[13px] font-semibold text-ink-900 mb-4"><i class="fa-solid fa-hand-holding-dollar mr-1.5 text-zc-800"></i>請求を送信</div>
+                  <div class="space-y-4">
+                    <div>
+                      <label class="block text-[11px] text-ink-500 uppercase tracking-wider mb-2">請求先口座番号</label>
+                      <input type="text" x-model="rtpPayerAccount" placeholder="口座番号（10桁）" maxlength="10"
+                        class="w-full rounded-2xl border border-bd bg-white/90 px-4 py-3 text-[14px] font-mono text-ink-900 focus:border-zc-700 focus:ring-2 focus:ring-zc-900/10 transition-colors placeholder:text-ink-300">
+                    </div>
+                    <div>
+                      <label class="block text-[11px] text-ink-500 uppercase tracking-wider mb-2">請求金額</label>
+                      <div class="relative">
+                        <span class="absolute left-4 top-1/2 -translate-y-1/2 text-[16px] text-ink-400 font-serif">¥</span>
+                        <input type="number" x-model="rtpAmount" min="1" placeholder="0"
+                          class="w-full rounded-2xl border border-bd bg-white/90 pl-9 pr-4 py-3 text-[18px] font-semibold text-ink-950 focus:border-zc-700 focus:ring-2 focus:ring-zc-900/10 transition-colors placeholder:text-ink-200">
+                      </div>
+                    </div>
+                    <div>
+                      <label class="block text-[11px] text-ink-500 uppercase tracking-wider mb-2">メッセージ（任意）</label>
+                      <input type="text" x-model="rtpMessage" placeholder="請求理由など"
+                        class="w-full rounded-2xl border border-bd bg-white/90 px-4 py-3 text-[14px] text-ink-900 focus:border-zc-700 focus:ring-2 focus:ring-zc-900/10 transition-colors placeholder:text-ink-300">
+                    </div>
+                    <button @click="sendRtpRequest()"
+                      :disabled="!rtpPayerAccount || rtpPayerAccount.length !== 10 || !rtpAmount || parseInt(rtpAmount) <= 0 || submitting"
+                      class="w-full rounded-2xl py-3.5 text-[14px] font-semibold text-white transition-colors disabled:opacity-40"
+                      style="background:#0E2445">
+                      <span x-text="submitting ? '送信中...' : '請求を送信する'"></span>
+                    </button>
+                    <template x-if="rtpSendResult">
+                      <div class="rounded-2xl p-4 text-center" style="background:rgba(31,90,58,0.06); border:1px solid rgba(31,90,58,0.18)">
+                        <i class="fa-solid fa-circle-check text-mat-700 text-[24px] mb-2"></i>
+                        <div class="text-[14px] font-semibold text-mat-700">請求を送信しました</div>
+                        <div class="mt-1 text-[11px] font-mono text-ink-500" x-text="rtpSendResult.request_id || rtpSendResult.id"></div>
+                      </div>
+                    </template>
+                    <template x-if="rtpSendError">
+                      <div class="rounded-2xl p-3.5" style="background:rgba(180,56,46,0.06); border:1px solid rgba(180,56,46,0.18)">
+                        <div class="text-[13px] text-vml-700"><i class="fa-solid fa-circle-xmark mr-1"></i><span x-text="rtpSendError"></span></div>
+                      </div>
+                    </template>
+                  </div>
+                </div>
+              </template>
+
+              <!-- Incoming requests -->
+              <template x-if="rtpSubTab === 'inbox'">
+                <div class="rounded-3xl glass-dark shadow-soft overflow-hidden fade-in">
+                  <div class="px-4 py-3 flex items-center justify-between border-b border-bd">
+                    <div class="text-[13px] font-semibold text-ink-900"><i class="fa-solid fa-inbox mr-1.5"></i>受信した請求</div>
+                    <button @click="loadIncomingRequests()"
+                      class="w-8 h-8 rounded-xl border border-bd bg-white/90 flex items-center justify-center hover:bg-white transition-colors">
+                      <i class="fa-solid fa-arrows-rotate text-[12px] text-ink-500"></i>
+                    </button>
+                  </div>
+
+                  <template x-if="!incomingRequests.length">
+                    <div class="py-12 text-center">
+                      <i class="fa-solid fa-inbox text-[28px] text-ink-300 mb-3"></i>
+                      <div class="text-[13px] text-ink-500">受信した請求はありません</div>
+                    </div>
+                  </template>
+
+                  <div class="divide-y divide-bd">
+                    <template x-for="req in incomingRequests" :key="req.rtp_id">
+                      <div class="px-4 py-4 fade-in">
+                        <div class="flex items-start justify-between gap-3 mb-3">
+                          <div class="min-w-0">
+                            <div class="text-[12px] font-semibold text-ink-900"><i class="fa-solid fa-hand-holding-dollar mr-1 text-gld-700"></i>支払請求</div>
+                            <div class="mt-0.5 font-mono text-[10px] text-ink-400 truncate" x-text="req.rtp_id"></div>
+                          </div>
+                          <div class="flex-shrink-0 text-right">
+                            <div class="text-[16px] font-semibold font-serif" style="color:#8A6A2B"
+                              x-text="'¥\u2009' + Number(req.amount_value || 0).toLocaleString('ja-JP')"></div>
+                          </div>
+                        </div>
+
+                        <template x-if="req.description">
+                          <div class="mb-3 rounded-2xl px-3 py-2.5" style="background:rgba(14,36,69,0.05); border:1px solid rgba(14,36,69,0.1)">
+                            <div class="text-[10px] text-ink-400 mb-0.5"><i class="fa-solid fa-message mr-1"></i>メッセージ</div>
+                            <div class="text-[13px] text-ink-800" x-text="req.description"></div>
+                          </div>
+                        </template>
+
+                        <div class="rounded-2xl overflow-hidden border border-bd mb-3">
+                          <div class="px-3 py-2 flex items-center justify-between bg-white/60">
+                            <span class="text-[10px] text-ink-400">請求元名義</span>
+                            <span class="text-[11px] font-semibold text-ink-800" x-text="req.payee_name || '-'"></span>
+                          </div>
+                          <div class="px-3 py-2 flex items-center justify-between bg-white/40 border-t border-bd">
+                            <span class="text-[10px] text-ink-400">請求元銀行コード</span>
+                            <span class="text-[11px] font-mono text-ink-600" x-text="req.payee_bank_id || '-'"></span>
+                          </div>
+                          <div class="px-3 py-2 flex items-center justify-between bg-white/30 border-t border-bd">
+                            <span class="text-[10px] text-ink-400">有効期限</span>
+                            <span class="text-[11px] font-mono text-ink-500" x-text="req.expires_at ? new Date(req.expires_at).toLocaleString('ja-JP') : '-'"></span>
+                          </div>
+                        </div>
+
+                        <div class="flex gap-2">
+                          <button @click="respondRtp(req.rtp_id, 'REJECTED')"
+                            :disabled="rtpRespondLoading === req.rtp_id"
+                            class="flex-1 rounded-2xl py-2.5 text-[13px] font-semibold border border-bd text-vml-700 hover:bg-red-50 hover:border-red-200 transition-colors disabled:opacity-40">
+                            <i class="fa-solid fa-xmark mr-1"></i>拒否
+                          </button>
+                          <button @click="respondRtp(req.rtp_id, 'ACCEPTED')"
+                            :disabled="rtpRespondLoading === req.rtp_id"
+                            class="flex-[2] rounded-2xl py-2.5 text-[13px] font-semibold text-white transition-colors disabled:opacity-40"
+                            style="background:#1F5A3A">
+                            <span x-text="rtpRespondLoading === req.rtp_id ? '処理中...' : '支払う'"></span>
+                            <i class="fa-solid fa-check ml-1"></i>
+                          </button>
+                        </div>
+                      </div>
+                    </template>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </template>
+
+        </div>
+      </div>
+
+      <!-- ── Bottom Tab Bar ── -->
+      <div class="fixed bottom-0 left-0 right-0 z-20 bg-white/90 backdrop-blur border-t border-bd"
+        :style="'padding-bottom: calc(var(--sab) + 6px)'">
+        <div class="max-w-md mx-auto px-1 pt-2 flex items-center overflow-x-auto hide-scrollbar">
+          <template x-for="t in [
+            {key:'home',     label:'ホーム',     fa:'fa-solid fa-house'},
+            {key:'transfer', label:'振込',       fa:'fa-solid fa-paper-plane'},
+            {key:'history',  label:'明細',       fa:'fa-solid fa-clock-rotate-left'},
+            {key:'approval', label:'承認',       fa:'fa-solid fa-stamp'},
+            {key:'status',   label:'状況',       fa:'fa-solid fa-magnifying-glass'},
+            {key:'alias',    label:'エイリアス', fa:'fa-solid fa-at'},
+            {key:'qr',       label:'QR',         fa:'fa-solid fa-qrcode'},
+            {key:'request',  label:'請求',       fa:'fa-solid fa-hand-holding-dollar'}
+          ]" :key="t.key">
+            <button @click="tab = t.key; onTabChange(t.key)"
+              class="flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-2xl transition-colors flex-shrink-0 min-w-[52px]"
+              :class="tab === t.key ? 'text-zc-900' : 'text-ink-300 hover:text-ink-500'">
+              <div class="relative">
+                <i :class="t.fa" class="text-[18px]"></i>
+                <template x-if="t.key === 'approval' && approvals.length > 0">
+                  <span class="absolute -top-1.5 -right-2 w-4 h-4 rounded-full bg-vml-600 text-white text-[9px] flex items-center justify-center font-bold"
+                    x-text="approvals.length > 9 ? '9+' : approvals.length"></span>
+                </template>
+                <template x-if="t.key === 'home' && notifCount > 0">
+                  <span class="absolute -top-1.5 -right-2 w-4 h-4 rounded-full bg-vml-600 text-white text-[9px] flex items-center justify-center font-bold"
+                    x-text="notifCount > 9 ? '9+' : notifCount"></span>
+                </template>
+                <template x-if="t.key === 'request' && incomingRequests.length > 0">
+                  <span class="absolute -top-1.5 -right-2 w-4 h-4 rounded-full bg-vml-600 text-white text-[9px] flex items-center justify-center font-bold"
+                    x-text="incomingRequests.length > 9 ? '9+' : incomingRequests.length"></span>
+                </template>
+              </div>
+              <span class="text-[10px] font-medium" x-text="t.label"></span>
+            </button>
+          </template>
+        </div>
+      </div>
+
+    </div>
+  </template>
+
+</div>
+
+<script>
+// Party-scoped read headers (requirements S-5/S-7,
+// docs/specs/32_api_contracts.md § 照会の認可): the customer app reads only its own
+// bank's transactions, under purpose P01 (顧客対応のための状態照会).
+function partyReadH(bankId) {
+  return { 'X-Bank-Id': bankId ?? '', 'X-Purpose-Code': 'P01' };
+}
+document.addEventListener('alpine:init', () => {
+  Alpine.data('bankApp', () => ({
+    screen: 'bankSelect',
+    tab: 'home',
+    bankId: null,
+    bankName: '',
+    accountId: null,
+    customerId: null,
+    customerName: '',
+    banks: [],
+    accounts: [],
+    balance: null,
+    history: [],
+    histSearch: { txid: '', dateFrom: '', dateTo: '' },
+    approvals: [],
+    approvalLoading: null,
+    selectedTx: null,
+    txEvents: [],
+    transferStep: 1,
+    submitting: false,
+    tf: { payeeAccount: '', payeeName: '', payeeError: '', submitError: '', amount: '' },
+    lastTxid: null,
+    txStatus: null,
+    // Alias transfer
+    aliasMode: false,
+    aliasSubTab: 'send',
+    proxyType: 'PHONE',
+    proxyValue: '',
+    proxyResolved: null,
+    aliasAmount: '',
+    aliasResult: null,
+    aliasError: '',
+    regProxyType: 'PHONE',
+    regProxyValue: '',
+    regProxyResult: null,
+    regProxyError: '',
+    // QR
+    qrSubTab: 'generate',
+    qrAmount: '',
+    qrMemo: '',
+    qrResult: null,
+    qrPayRef: '',
+    qrPayAmount: '',
+    qrPayResult: null,
+    qrPayError: '',
+    qrCameraActive: false,
+    qrStream: null,
+    qrScanFrameId: null,
+    // RTP (Payment Request)
+    rtpSubTab: 'send',
+    rtpPayerAccount: '',
+    rtpAmount: '',
+    rtpMessage: '',
+    rtpSendResult: null,
+    rtpSendError: '',
+    incomingRequests: [],
+    rtpRespondLoading: null,
+    // Notification
+    notifCount: 0,
+    _notifTimer: null,
+
+    async init() {
+      const r = await fetch('/api/banks').then(r => r.json()).catch(() => ({}));
+      this.banks = r.banks ?? r ?? [];
+    },
+
+    async loadApprovals() {
+      if (!this.bankId || !this.customerId) return;
+      const r = await fetch(`/bank/${this.bankId}/v1/me/approvals`, {
+        headers: this.customerH()
+      }).then(r => r.json()).catch(() => ({}));
+      this.approvals = r.approvals ?? [];
+    },
+
+    async respondApproval(approvalId, approved) {
+      this.approvalLoading = approvalId;
+      try {
+        await fetch(`/bank/${this.bankId}/v1/me/approvals/${approvalId}/respond`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...this.customerH() },
+          body: JSON.stringify({ approved }),
+        });
+        await this.loadApprovals();
+      } catch(e) {
+        console.error('respond error', e);
+      } finally {
+        this.approvalLoading = null;
+      }
+    },
+
+    async showTxDetail(txid) {
+      this.selectedTx = { txid };
+      this.txEvents = [];
+      this.tab = 'history';
+      try {
+        const [txRes, evRes] = await Promise.all([
+          // Party-scoped reads (S-5/S-7): this app reads as its own participant,
+          // declaring P01 (顧客対応のための自社取引の状態照会).
+          fetch(`/api/transactions/${txid}`, { headers: partyReadH(this.bankId) }).then(r => r.json()),
+          fetch(`/api/transactions/${txid}/events`, { headers: partyReadH(this.bankId) }).then(r => r.json()),
+        ]);
+        this.selectedTx = txRes.transaction || txRes || { txid };
+        this.txEvents = evRes.events || [];
+      } catch(e) {
+        console.error('tx detail error', e);
+      }
+    },
+
+    customerH() {
+      return { 'X-Bank-Id': this.bankId, 'X-Customer-Id': this.customerId };
+    },
+    tellerH() {
+      return { 'X-Bank-Id': this.bankId, 'X-Teller-Id': 'TELLER-001' };
+    },
+
+    async selectBank(id, name) {
+      this.bankId = id;
+      this.bankName = name || id;
+      const r = await fetch(`/bank/${id}/v1/teller/accounts`, {
+        headers: { 'X-Bank-Id': id, 'X-Teller-Id': 'TELLER-001' }
+      }).then(r => r.json()).catch(() => ({}));
+      this.accounts = (r.accounts ?? r ?? []).filter(a => a.account_type === 'SAVINGS' || a.account_type === 'CURRENT');
+      this.screen = 'accountSelect';
+    },
+
+    async selectAccount(accountId, customerId, customerName) {
+      this.accountId = accountId;
+      this.customerId = customerId;
+      this.customerName = customerName || '';
+      this.screen = 'main';
+      this.tab = 'home';
+      await Promise.all([this.loadBalance(), this.loadHistory(), this.loadApprovals()]);
+      this.startNotifPolling();
+    },
+
+    async loadBalance() {
+      const r = await fetch(
+        `/bank/${this.bankId}/v1/me/accounts/${this.accountId}/balance`,
+        { headers: this.customerH() }
+      ).then(r => r.json()).catch(() => ({}));
+      this.balance = r.balance ?? r.available_balance ?? null;
+    },
+
+    async verifyPayee() {
+      this.tf.payeeName = '';
+      this.tf.payeeError = '';
+      if (!this.tf.payeeAccount) return;
+      try {
+        const resp = await fetch(`/api/accounts/${this.tf.payeeAccount}/name`);
+        const r = await resp.json();
+        if (!resp.ok) {
+          this.tf.payeeError = r.reason_code === 'ACCOUNT_NOT_TRANSFERABLE'
+            ? 'この口座には振込できません'
+            : r.reason_code === 'NOT_FOUND'
+            ? '口座が見つかりません'
+            : '名義照会に失敗しました';
+          return;
+        }
+        this.tf.payeeName = r.name ?? r.customer_name ?? 'Unknown';
+      } catch(e) {
+        this.tf.payeeError = '名義照会に失敗しました';
+      }
+    },
+
+    async submitTransfer() {
+      this.submitting = true;
+      this.tf.submitError = '';
+      try {
+        const res = await fetch(`/bank/${this.bankId}/v1/me/transfers`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...this.customerH() },
+          body: JSON.stringify({
+            payee_bank_id: this.tf.payeeAccount.slice(0, 3),
+            payee_account_hash: this.tf.payeeAccount,
+            amount: { value: parseInt(this.tf.amount), currency: 'JPY' },
+            lane: 'EXPRESS',
+            purpose: 'P2P',
+            idempotency_key: crypto.randomUUID(),
+          }),
+        });
+        const r = await res.json();
+        if (!res.ok) {
+          this.tf.submitError = r.message ?? r.error ?? `エラー (${res.status})`;
+          return;
+        }
+        this.lastTxid = r.txid ?? r.transaction?.txid ?? null;
+        this.txStatus = null;
+        this.transferStep = 4;
+        await this.loadBalance();
+      } catch(e) {
+        this.tf.submitError = '通信エラー: ' + e.message;
+      } finally {
+        this.submitting = false;
+      }
+    },
+
+    async loadHistory() {
+      const params = new URLSearchParams({ limit: '50' });
+      if (this.histSearch.txid)     params.set('txid',      this.histSearch.txid);
+      if (this.histSearch.dateFrom) params.set('date_from', this.histSearch.dateFrom);
+      if (this.histSearch.dateTo)   params.set('date_to',   this.histSearch.dateTo);
+      const r = await fetch(
+        `/bank/${this.bankId}/v1/me/accounts/${this.accountId}/transactions?${params.toString()}`,
+        { headers: this.customerH() }
+      ).then(r => r.json()).catch(() => ({}));
+      this.history = r.transactions ?? r.journals ?? r ?? [];
+    },
+
+    async checkStatus() {
+      if (!this.lastTxid) return;
+      const r = await fetch(
+        `/bank/${this.bankId}/v1/me/transfers/${this.lastTxid}`,
+        { headers: this.customerH() }
+      ).then(r => r.json()).catch(() => ({}));
+      this.txStatus = r;
+    },
+
+    // ── Proxy / Alias resolution ──
+    async registerProxy() {
+      this.submitting = true;
+      this.regProxyError = '';
+      this.regProxyResult = null;
+      try {
+        const res = await fetch('/api/proxy/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+             proxy_type: this.regProxyType,
+             proxy_value: this.regProxyValue,
+             account_id: this.accountId,
+             bank_id: this.bankId,
+             account_holder_name: this.customerName,
+             idempotency_key: 'PROXY-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8),
+          }),
+        });
+        const r = await res.json();
+        if (!res.ok) {
+           this.regProxyError = r.message || r.error || '登録に失敗しました';
+           return;
+        }
+        this.regProxyResult = r;
+      } catch (e) {
+        this.regProxyError = '通信エラー: ' + e.message;
+      } finally {
+        this.submitting = false;
+      }
+    },
+
+    async resolveProxy() {
+      this.proxyResolved = null;
+      this.aliasError = '';
+      if (!this.proxyValue) return;
+      try {
+        const res = await fetch(`/api/proxy/resolve?proxy_type=${encodeURIComponent(this.proxyType)}&proxy_value=${encodeURIComponent(this.proxyValue)}`);
+        const r = await res.json();
+        if (!res.ok) {
+          this.aliasError = r.message || r.error || 'エイリアスの解決に失敗しました';
+          return;
+        }
+        this.proxyResolved = r;
+        // Also set the transfer payee if in transfer tab
+        if (r.account_id) {
+          this.tf.payeeAccount = r.account_id;
+          this.tf.payeeName = r.account_holder_name || '';
+        }
+      } catch (e) {
+        this.aliasError = '通信エラー: ' + e.message;
+      }
+    },
+
+    async sendAliasTransfer() {
+      if (!this.proxyResolved || !this.aliasAmount) return;
+      this.submitting = true;
+      this.aliasResult = null;
+      this.aliasError = '';
+      try {
+        const acct = this.proxyResolved.account_id;
+        const res = await fetch(`/bank/${this.bankId}/v1/me/transfers`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...this.customerH() },
+          body: JSON.stringify({
+            payee_bank_id: acct.slice(0, 3),
+            payee_account_hash: acct,
+            amount: { value: parseInt(this.aliasAmount), currency: 'JPY' },
+            lane: 'EXPRESS',
+            purpose: 'P2P',
+            idempotency_key: crypto.randomUUID(),
+          }),
+        });
+        const r = await res.json();
+        if (!res.ok) {
+          this.aliasError = r.message || r.error || `エラー (${res.status})`;
+          return;
+        }
+        this.aliasResult = r;
+        this.lastTxid = r.txid || (r.transaction && r.transaction.txid) || null;
+        await this.loadBalance();
+      } catch (e) {
+        this.aliasError = '通信エラー: ' + e.message;
+      } finally {
+        this.submitting = false;
+      }
+    },
+
+    // ── QR ──
+    async generateQr() {
+      this.submitting = true;
+      this.qrResult = null;
+      try {
+        const res = await fetch(`/api/qr/generate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...this.customerH() },
+          body: JSON.stringify({
+            type: this.qrAmount ? 'DYNAMIC' : 'STATIC',
+            payee_bank_id: this.bankId,
+            payee_account_id: this.accountId,
+            ...(this.qrAmount ? { amount: parseInt(this.qrAmount) } : {}),
+            ...(this.qrMemo ? { purpose: this.qrMemo } : {}),
+          }),
+        });
+        this.qrResult = await res.json();
+      } catch (e) {
+        console.error('QR generate error', e);
+      } finally {
+        this.submitting = false;
+      }
+    },
+
+    async payQr() {
+      this.submitting = true;
+      this.qrPayResult = null;
+      this.qrPayError = '';
+      try {
+        const res = await fetch(`/api/qr/pay`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...this.customerH() },
+          body: JSON.stringify({
+            qr_ref: this.qrPayRef,
+            payer_bank_id: this.bankId,
+            payer_account_id: this.accountId,
+            ...(this.qrPayAmount ? { amount: parseInt(this.qrPayAmount) } : {}),
+            idempotency_key: crypto.randomUUID(),
+          }),
+        });
+        const r = await res.json();
+        if (!res.ok) {
+          this.qrPayError = r.message || r.error || `エラー (${res.status})`;
+          return;
+        }
+        this.qrPayResult = r;
+        await this.loadBalance();
+      } catch (e) {
+        this.qrPayError = '通信エラー: ' + e.message;
+      } finally {
+        this.submitting = false;
+      }
+    },
+
+    // ── QR Camera ──
+    async startQrCamera() {
+      this.qrPayError = '';
+      try {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+           throw new Error('お使いのブラウザはカメラ機能に対応していません。手動でご入力ください。');
+        }
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } } });
+        this.qrStream = stream;
+        this.qrCameraActive = true;
+        await this.$nextTick();
+        const video = this.$refs.qrVideo;
+        video.srcObject = stream;
+        await video.play();
+        this.scanQrFrame();
+      } catch (e) {
+        this.qrPayError = 'カメラにアクセスできません: ' + e.message;
+      }
+    },
+    stopQrCamera() {
+      if (this.qrStream) {
+        this.qrStream.getTracks().forEach(t => t.stop());
+        this.qrStream = null;
+      }
+      if (this.qrScanFrameId) {
+        cancelAnimationFrame(this.qrScanFrameId);
+        this.qrScanFrameId = null;
+      }
+      this.qrCameraActive = false;
+    },
+    scanQrFrame() {
+      if (!this.qrCameraActive) return;
+      const video = this.$refs.qrVideo;
+      const canvas = this.$refs.qrCanvas;
+      if (video && video.readyState === video.HAVE_ENOUGH_DATA) {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const code = typeof jsQR !== 'undefined' && jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: 'dontInvert' });
+        if (code && code.data) {
+          this.qrPayRef = code.data;
+          this.stopQrCamera();
+          return;
+        }
+      }
+      this.qrScanFrameId = requestAnimationFrame(() => this.scanQrFrame());
+    },
+
+    // ── RTP (Payment Request) ──
+    async sendRtpRequest() {
+      this.submitting = true;
+      this.rtpSendResult = null;
+      this.rtpSendError = '';
+      try {
+        const rtpId = 'RTP-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
+        const payerBankId = this.rtpPayerAccount.slice(0, 3);
+        const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+        const idempotencyKey = 'RTP-REQ-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
+        const res = await fetch(`/api/rtp/request`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...this.customerH() },
+          body: JSON.stringify({
+            rtp_id: rtpId,
+            payee_bank_id: this.bankId,
+            payer_bank_id: payerBankId,
+            payee_account: this.accountId,
+            payer_account: this.rtpPayerAccount,
+            amount: { value: parseInt(this.rtpAmount), currency: 'JPY' },
+            expires_at: expiresAt,
+            idempotency_key: idempotencyKey,
+            payee_name: this.customerName || undefined,
+            description: this.rtpMessage || undefined,
+          }),
+        });
+        const r = await res.json();
+        if (!res.ok) {
+          this.rtpSendError = r.message || r.error || `エラー (${res.status})`;
+          return;
+        }
+        this.rtpSendResult = r;
+      } catch (e) {
+        this.rtpSendError = '通信エラー: ' + e.message;
+      } finally {
+        this.submitting = false;
+      }
+    },
+
+    async loadIncomingRequests() {
+      try {
+        const res = await fetch(`/api/rtp/incoming?account=${encodeURIComponent(this.accountId)}`, {
+          headers: this.customerH(),
+        });
+        const r = await res.json();
+        this.incomingRequests = r.requests || r || [];
+      } catch (e) {
+        console.error('load incoming requests error', e);
+        this.incomingRequests = [];
+      }
+    },
+
+    async respondRtp(requestId, decision) {
+      this.rtpRespondLoading = requestId;
+      try {
+        const res = await fetch(`/api/rtp/${requestId}/respond`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...this.customerH() },
+          body: JSON.stringify({
+            response: decision,
+            payer_bank_id: this.bankId,
+            payer_account_id: this.accountId,
+            idempotency_key: 'RTP-RESP-' + requestId + '-' + Date.now(),
+          }),
+        });
+        const r = await res.json();
+        if (!res.ok) {
+          alert('エラー: ' + (r.message || r.error || res.status));
+        } else if (decision === 'ACCEPTED') {
+          alert('支払いが完了しました。取引ID: ' + (r.txid || '-'));
+        } else {
+          alert('請求を拒否しました。');
+        }
+        await this.loadIncomingRequests();
+        if (decision === 'ACCEPTED') {
+          await this.loadBalance();
+          await this.loadHistory();
+        }
+      } catch (e) {
+        console.error('rtp respond error', e);
+        alert('通信エラー: ' + e.message);
+      } finally {
+        this.rtpRespondLoading = null;
+      }
+    },
+
+    // ── Notification polling ──
+    startNotifPolling() {
+      if (this._notifTimer) return;
+      this._notifTimer = setInterval(async () => {
+        try {
+          const res = await fetch(
+            `/bank/${this.bankId}/v1/me/accounts/${this.accountId}/transactions`,
+            { headers: this.customerH() }
+          );
+          const r = await res.json();
+          const txns = r.transactions || r.journals || r || [];
+          const settled = txns.filter(t => t.tx_state === 'SETTLED' && (t.amount || 0) > 0);
+          const newCount = settled.length;
+          if (newCount > this.notifCount && this.notifCount > 0) {
+            // New incoming credit detected
+          }
+          this.notifCount = newCount;
+        } catch (e) { /* silent */ }
+      }, 15000);
+    },
+
+    stopNotifPolling() {
+      if (this._notifTimer) { clearInterval(this._notifTimer); this._notifTimer = null; }
+    },
+
+    onTabChange(t) {
+      if (t === 'history')  this.loadHistory();
+      if (t === 'status')   this.checkStatus();
+      if (t === 'approval') { this.loadApprovals(); this.selectedTx = null; this.txEvents = []; }
+      if (t === 'request')  this.loadIncomingRequests();
+      if (t === 'alias')    { this.aliasResult = null; this.aliasError = ''; }
+      if (t === 'qr')       { this.qrResult = null; this.qrPayResult = null; this.qrPayError = ''; this.stopQrCamera(); }
+    },
+
+    resetTransfer() {
+      this.transferStep = 1;
+      this.tf = { payeeAccount: '', payeeName: '', payeeError: '', submitError: '', amount: '' };
+    },
+
+    // 勘定日付を和風短縮表示 "YYYY-MM-DD" → "M月D日"
+    formatValueDate(d) {
+      if (!d) return '';
+      const m = parseInt(d.slice(5, 7), 10);
+      const day = parseInt(d.slice(8, 10), 10);
+      return `${m}月${day}日`;
+    },
+
+    // ZC内部ステートを顧客向け日本語に変換
+    txStateLabel(state) {
+      const map = {
+        'RECEIVED':    '受付済み',
+        'PRECHECKED':  '審査中',
+        'RESERVED':    '処理中',
+        'EXECUTING':   '処理中',
+        'SETTLING':    '処理中',
+        'SETTLED':     '入金完了',
+        'CANCELLED':   'お取消し',
+        'FAIL_DEBIT':  '出金エラー',
+        'FAIL_CREDIT': '入金エラー',
+        'FAIL_TIMEOUT':'処理タイムアウト',
+        'SUSPENDED':   '保留中',
+        'AWAITING_PAYEE_APPROVAL': '着金先承認待ち',
+        'PAYEE_FILTER_REJECTED':   '着金先フィルタ拒否',
+        'EXEC_CREDIT_FAILED':      '着金処理エラー',
+      };
+      return map[state] || state;
+    },
+  }));
+});
+</script>
+</body>
+</html>

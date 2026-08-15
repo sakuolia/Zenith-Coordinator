@@ -1,0 +1,68 @@
+name: CI
+
+# Gate every push and pull request on the three checks that must never regress:
+# `npm run lint:ci` (biome, src must be warning-clean), `npm run type-check`
+# (tsc --noEmit) and `npm run test` (vitest run). A broken build reaching the
+# branch — e.g. a duplicated route handler that fails tsc, or a stray `any`
+# slipping back into src — is exactly what this is here to stop. Make this a
+# required status check in the branch protection settings so a red run blocks
+# merge.
+#
+# Lint scope note: the gate is `biome lint src --error-on-warnings` (src only).
+# The test tree intentionally uses `any` casts against the D1 mock and is not
+# warning-clean; gating it would be noise, so it is excluded from the hard gate
+# (run `npm run lint` locally for the full, non-blocking report).
+#
+# Format scope note: `npm run format:check` covers the WHOLE tree, unlike lint.
+# Formatting has no false positives to tolerate — a file either matches
+# biome.json or it does not — so there is no reason to exempt test/. This gate
+# exists because the repo had silently drifted to 127 unformatted files: with
+# `npm run format` opt-in and nothing checking it, every change that touched a
+# drifted file dragged unrelated reformat hunks into its diff. Fix a failure
+# with `npm run format`, never by narrowing this step's scope.
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+# Cancel superseded runs on the same ref so a quick succession of pushes does
+# not pile up redundant builds.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: lint + type-check + test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20" # LTS; satisfies the README's Node 18+ requirement
+          cache: npm
+
+      # `npm ci` builds better-sqlite3 (a native addon used by the D1 test mock)
+      # against the runner's Node, so the install step doubles as a compile check.
+      - name: Install dependencies
+        run: npm ci
+
+      # Biome lint over src/, failing on warnings. Keeps the production source
+      # warning-clean (no stray `any`, dead imports, etc.). Runs before the
+      # heavier type-check/test steps so a lint regression fails fast.
+      - name: Lint (src)
+        run: npm run lint:ci
+
+      # Formatting check over the whole tree. Cheap, deterministic, and runs
+      # early so a missing `npm run format` fails in seconds rather than after
+      # the test suite.
+      - name: Format check
+        run: npm run format:check
+
+      - name: Type-check
+        run: npm run type-check
+
+      - name: Test
+        run: npm run test

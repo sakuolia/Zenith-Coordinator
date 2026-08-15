@@ -1,0 +1,879 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Zenith Settlement Theater</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      fontFamily: {
+        jp: ['"Noto Sans JP"','"Hiragino Sans"','"Yu Gothic"','sans-serif'],
+        serif: ['"source-han-serif-japanese"','"Hiragino Mincho ProN"','"Yu Mincho"','serif'],
+      },
+      colors: {
+        brand: {
+          50:  '#eef4ff',
+          100: '#d9e8fb',
+          500: '#003366',
+          600: '#0066CC',
+          700: '#004499',
+        },
+        accent: '#FF6600',
+        ink:    '#0b1424',
+      },
+    }
+  }
+}
+</script>
+<style>
+  body { background: radial-gradient(ellipse at top, #0f1d36 0%, #060b18 60%, #03060e 100%); color:#dbe7ff; }
+  .mono { font-family:'SF Mono','Consolas','Courier New',monospace; }
+  .glow { text-shadow: 0 0 10px rgba(120, 180, 255, .55); }
+
+  /* Stage layout */
+  .stage-wrap { background: rgba(10,18,36,.55); border:1px solid rgba(120,160,255,.18); border-radius:14px; backdrop-filter: blur(6px); }
+  .actor-col { position: relative; }
+  .lifeline { position:absolute; left:50%; top:60px; bottom:0; width:2px; background:linear-gradient(to bottom, rgba(140,180,255,.45), rgba(140,180,255,.05)); transform:translateX(-50%); }
+  .actor-card { background: rgba(20,32,60,.85); border:1px solid rgba(140,180,255,.25); border-radius:10px; padding:10px 12px; text-align:center; font-size:12px; color:#e8efff; box-shadow: 0 6px 18px rgba(0,0,0,.35); }
+  .actor-card .role { font-size:10px; color:#9fb6e2; letter-spacing:.12em; text-transform:uppercase; }
+  .actor-card .name { font-weight:600; margin-top:2px; }
+
+  /* Scene rows */
+  .scene-row { position:relative; min-height:54px; }
+  .scene-row .ts { position:absolute; left:8px; top:8px; font-size:10px; color:#7e94c1; font-family:'SF Mono','Consolas',monospace; }
+
+  /* Arrow */
+  .arrow-line { position:absolute; height:2px; top:50%; transform:translateY(-50%); background:linear-gradient(90deg, rgba(120,200,255,.85), rgba(120,200,255,.95)); border-radius:2px; transition: transform .35s cubic-bezier(.25,.7,.25,1), opacity .25s; transform-origin: left center; opacity:0; }
+  .arrow-line.dashed { background-image: repeating-linear-gradient(90deg, rgba(180,210,255,.9) 0 6px, transparent 6px 12px); background-color: transparent; }
+  .arrow-line.show { opacity:1; transform: translateY(-50%) scaleX(1); }
+  .arrow-tip { position:absolute; top:50%; transform:translate(-100%,-50%); width:0;height:0; border-top:6px solid transparent; border-bottom:6px solid transparent; border-left:9px solid rgba(150,210,255,.95); opacity:0; transition: opacity .2s .25s; filter: drop-shadow(0 0 4px rgba(120,200,255,.5)); }
+  .arrow-tip.show { opacity:1; }
+  .arrow-tip.left { transform: translate(0,-50%) rotate(180deg); }
+  .arrow-label { position:absolute; top:-18px; left:50%; transform:translateX(-50%); font-size:11px; color:#cfe1ff; background: rgba(15,28,55,.88); border:1px solid rgba(140,180,255,.25); border-radius:6px; padding:2px 8px; white-space:nowrap; opacity:0; transition: opacity .25s .2s; }
+  .arrow-label.show { opacity:1; }
+
+  /* Note (Note over X) */
+  .note-bubble { position:absolute; top:50%; transform:translate(-50%,-50%); background:rgba(255,220,140,.12); border:1px dashed rgba(255,220,140,.55); color:#ffe6a6; padding:4px 10px; border-radius:6px; font-size:11px; opacity:0; transition: opacity .25s; }
+  .note-bubble.show { opacity:1; }
+  .note-bubble.warn { background:rgba(255,140,140,.12); border-color: rgba(255,140,140,.55); color:#ffd2d2; }
+  .note-bubble.ok { background: rgba(120,255,180,.10); border-color: rgba(120,255,180,.55); color:#c8ffd9; }
+
+  /* Pulse on actor when active */
+  .actor-active .actor-card { border-color:#7ec8ff; box-shadow: 0 0 0 3px rgba(120,200,255,.2), 0 8px 22px rgba(0,0,0,.4); transition: box-shadow .25s, border-color .25s; }
+  .actor-pulse { animation: pulseRing 1.1s ease-out 1; }
+  @keyframes pulseRing { 0% { box-shadow: 0 0 0 0 rgba(120,200,255,.55); } 100% { box-shadow: 0 0 0 14px rgba(120,200,255,0); } }
+
+  /* Buttons */
+  .btn { background:rgba(30,50,90,.7); border:1px solid rgba(140,180,255,.25); color:#dde7ff; padding:6px 12px; border-radius:8px; font-size:12px; transition: all .15s; }
+  .btn:hover { background:rgba(50,80,130,.85); border-color: rgba(180,210,255,.5); }
+  .btn.primary { background: linear-gradient(135deg, #1d4ea8, #0b66cc); border-color: rgba(180,210,255,.45); }
+  .btn.primary:hover { background: linear-gradient(135deg, #225ec3, #0d77ee); }
+  .btn.ghost { background:transparent; }
+  .badge { display:inline-block; padding:2px 8px; border-radius:999px; font-size:10px; letter-spacing:.05em; }
+  .badge-state-ok    { background: rgba(120,255,180,.15); color:#9ff5bf; border:1px solid rgba(120,255,180,.4);}
+  .badge-state-watch { background: rgba(255,220,140,.15); color:#ffe09a; border:1px solid rgba(255,220,140,.4);}
+  .badge-state-stuck { background: rgba(255,140,140,.15); color:#ffaaaa; border:1px solid rgba(255,140,140,.5);}
+  .badge-state-term  { background: rgba(160,180,220,.15); color:#cdd9ee; border:1px solid rgba(160,180,220,.4);}
+
+  /* Lane chip colors */
+  .lane-EXPRESS    { background:#1761c4; color:#dff0ff; }
+  .lane-STANDARD   { background:#3d8be0; color:#fff; }
+  .lane-HTLC       { background:#7c3aed; color:#fff; }
+  .lane-HTLC_AUTH  { background:#9b51e0; color:#fff; }
+  .lane-GTID       { background:#16a34a; color:#fff; }
+  .lane-RTP        { background:#0ea5e9; color:#fff; }
+  .lane-HIGH_VALUE { background:#dc2626; color:#fff; }
+  .lane-BULK       { background:#64748b; color:#fff; }
+
+  /* Scrollbar */
+  .stage-scroll::-webkit-scrollbar { width:8px; }
+  .stage-scroll::-webkit-scrollbar-thumb { background:rgba(140,180,255,.2); border-radius:4px; }
+
+  /* Narration */
+  .narration-line { padding:6px 10px; border-left: 2px solid rgba(140,180,255,.2); font-size:12px; color:#b6c8eb; opacity:.4; transition: all .35s; }
+  .narration-line.active { opacity:1; color:#e8efff; border-left-color:#7ec8ff; background: rgba(126,200,255,.06); }
+  .narration-line.past { opacity:.7; }
+
+  details > summary { cursor:pointer; list-style: none; }
+  details > summary::-webkit-details-marker { display:none; }
+
+  .scrubber { -webkit-appearance:none; appearance:none; height:4px; background:rgba(140,180,255,.18); border-radius:4px; }
+  .scrubber::-webkit-slider-thumb { -webkit-appearance:none; width:14px; height:14px; border-radius:50%; background:#7ec8ff; cursor:pointer; box-shadow: 0 0 8px rgba(126,200,255,.6); }
+  .scrubber::-moz-range-thumb { width:14px; height:14px; border-radius:50%; background:#7ec8ff; cursor:pointer; border:none; }
+
+  .chip { display:inline-flex; align-items:center; gap:4px; padding:2px 8px; border-radius:6px; font-size:11px; font-weight:500; }
+
+  /* Curtain reveal */
+  @keyframes curtainUp { from { transform:translateY(20px); opacity:0; } to { transform:none; opacity:1; } }
+  .curtain { animation: curtainUp .35s ease both; }
+</style>
+</head>
+<body class="font-jp min-h-screen">
+
+<header class="border-b border-white/10 px-5 py-3 flex items-center justify-between flex-wrap gap-3">
+  <div class="flex items-center gap-3">
+    <div>
+      <div class="font-serif text-xl tracking-widest text-blue-100 glow">Zenith</div>
+      <div class="text-[10px] text-blue-200/60 tracking-[0.25em] uppercase">Settlement Theater</div>
+    </div>
+    <span class="text-xs text-blue-200/40 hidden md:inline">— 取引が動く瞬間を、ひと幕の劇として観る</span>
+  </div>
+  <div class="flex items-center gap-2 text-xs">
+    <a href="/sky" class="text-blue-200/70 hover:text-white"><i class="fa-solid fa-moon mr-1"></i>Sky（決済の鼓動）</a>
+    <span class="text-blue-200/30">·</span>
+    <a href="/" class="text-blue-200/70 hover:text-white"><i class="fa-solid fa-arrow-left mr-1"></i>ダッシュボードへ戻る</a>
+  </div>
+</header>
+
+<main class="p-4 md:p-6 max-w-[1400px] mx-auto space-y-4">
+
+  <!-- Picker bar -->
+  <section class="stage-wrap p-4 flex flex-wrap items-end gap-3">
+    <div class="flex-1 min-w-[260px] max-w-full">
+      <label class="text-[10px] uppercase tracking-wider text-blue-200/60">取引を選ぶ</label>
+      <div class="flex gap-2 mt-1 min-w-0">
+        <select id="txPicker" class="flex-1 min-w-0 truncate bg-ink/70 border border-white/15 rounded-lg px-3 py-2 text-sm text-blue-100 focus:outline-none focus:border-blue-300/60">
+          <option value="">— 取引を読み込み中 —</option>
+        </select>
+        <button class="btn" id="btnReload" title="一覧を再取得"><i class="fa-solid fa-rotate"></i></button>
+        <button class="btn primary" id="btnShuffle"><i class="fa-solid fa-shuffle mr-1"></i>気まぐれ</button>
+      </div>
+    </div>
+    <div>
+      <label class="text-[10px] uppercase tracking-wider text-blue-200/60">フィルタ</label>
+      <div class="flex gap-1 mt-1" id="laneFilter">
+        <button class="btn ghost" data-lf="ALL">全て</button>
+        <button class="btn ghost" data-lf="EXPRESS">EXPRESS</button>
+        <button class="btn ghost" data-lf="HTLC">HTLC</button>
+        <button class="btn ghost" data-lf="GTID">GTID</button>
+        <button class="btn ghost" data-lf="STUCK">停滞のみ</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Header strip: tx info -->
+  <section id="txInfo" class="stage-wrap p-4 hidden">
+    <div class="flex flex-wrap items-center gap-3 justify-between">
+      <div class="flex flex-wrap items-center gap-3">
+        <span id="laneChip" class="chip lane-EXPRESS">EXPRESS</span>
+        <span class="mono text-xs text-blue-200/70" id="txidLabel">—</span>
+        <span class="text-xs text-blue-200/60">|</span>
+        <span class="text-sm" id="txAmount">—</span>
+        <span class="text-xs text-blue-200/60">|</span>
+        <span class="text-xs text-blue-200/70" id="txParties">—</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <span id="healthBadge" class="badge badge-state-ok">—</span>
+        <span id="chainBadge" class="badge" title="ハッシュチェーンの改ざん検知">—</span>
+      </div>
+    </div>
+    <div class="mt-2 text-xs text-blue-100/80" id="healthMsg">—</div>
+  </section>
+
+  <!-- Stage -->
+  <section id="stageSection" class="stage-wrap p-4 hidden">
+    <!-- Actor row -->
+    <div class="grid grid-cols-5 gap-2 mb-2 relative" id="actorsRow">
+      <div class="actor-col" data-actor="Customer">
+        <div class="actor-card"><div class="role"><i class="fa-solid fa-user mr-1"></i>顧客</div><div class="name">Customer</div></div>
+      </div>
+      <div class="actor-col" data-actor="PayerBank">
+        <div class="actor-card"><div class="role"><i class="fa-solid fa-building-columns mr-1"></i>送金元銀行</div><div class="name" id="payerBankName">PayerBank</div></div>
+      </div>
+      <div class="actor-col" data-actor="ZC">
+        <div class="actor-card" style="background:linear-gradient(135deg,#1a3a78,#0b66cc); border-color:rgba(180,210,255,.45)"><div class="role" style="color:#cfe6ff">Coordinator</div><div class="name">Zenith ZC</div></div>
+      </div>
+      <div class="actor-col" data-actor="PayeeBank">
+        <div class="actor-card"><div class="role"><i class="fa-solid fa-building-columns mr-1"></i>受取銀行</div><div class="name" id="payeeBankName">PayeeBank</div></div>
+      </div>
+      <div class="actor-col" data-actor="IGS">
+        <div class="actor-card"><div class="role"><i class="fa-solid fa-network-wired mr-1"></i>RTGS</div><div class="name">IGS</div></div>
+      </div>
+    </div>
+
+    <!-- Stage scrollable -->
+    <div class="grid grid-cols-5 gap-2 relative">
+      <div class="actor-col"><div class="lifeline"></div></div>
+      <div class="actor-col"><div class="lifeline"></div></div>
+      <div class="actor-col"><div class="lifeline"></div></div>
+      <div class="actor-col"><div class="lifeline"></div></div>
+      <div class="actor-col"><div class="lifeline"></div></div>
+
+      <!-- Scenes container, absolute over the columns -->
+      <div id="scenes" class="absolute inset-0 stage-scroll overflow-y-auto pr-2" style="min-height:400px; max-height:480px;"></div>
+    </div>
+
+    <!-- Playback controls -->
+    <div class="mt-4 flex flex-wrap items-center gap-3 border-t border-white/10 pt-3">
+      <button class="btn primary" id="btnPlay"><i class="fa-solid fa-play mr-1"></i>再生</button>
+      <button class="btn" id="btnStep"><i class="fa-solid fa-forward-step mr-1"></i>1コマ</button>
+      <button class="btn" id="btnReset"><i class="fa-solid fa-rotate-left mr-1"></i>巻き戻し</button>
+      <div class="flex items-center gap-1 ml-2">
+        <span class="text-[11px] text-blue-200/60">速度</span>
+        <button class="btn ghost speed-btn" data-speed="0.5">×0.5</button>
+        <button class="btn ghost speed-btn active" data-speed="1">×1</button>
+        <button class="btn ghost speed-btn" data-speed="2">×2</button>
+        <button class="btn ghost speed-btn" data-speed="4">×4</button>
+      </div>
+      <label class="ml-2 text-[11px] text-blue-200/60 flex items-center gap-1"><input type="checkbox" id="loopChk"> ループ</label>
+      <label class="ml-2 text-[11px] text-blue-200/60 flex items-center gap-1"><input type="checkbox" id="condenseChk" checked> 等間隔再生（実時間ギャップを圧縮）</label>
+      <div class="ml-auto flex items-center gap-2 min-w-[200px]">
+        <span class="text-[11px] text-blue-200/60 mono" id="sceneCounter">0 / 0</span>
+        <input type="range" id="scrubber" class="scrubber flex-1" min="0" max="0" value="0">
+      </div>
+    </div>
+  </section>
+
+  <!-- Narration & details -->
+  <section id="narrationSection" class="grid md:grid-cols-3 gap-4 hidden">
+    <div class="md:col-span-2 min-w-0 stage-wrap p-4">
+      <div class="text-[10px] uppercase tracking-wider text-blue-200/60 mb-2">ナラティブ</div>
+      <p id="narrativePara" class="text-sm leading-relaxed text-blue-100/90 break-words">—</p>
+      <div id="narrationStream" class="mt-3 space-y-1 max-h-56 overflow-y-auto overflow-x-hidden break-words pr-1"></div>
+    </div>
+    <div class="min-w-0 stage-wrap p-4">
+      <div class="text-[10px] uppercase tracking-wider text-blue-200/60 mb-2">この劇のあらすじ</div>
+      <div class="text-xs text-blue-100/80 space-y-1 break-words">
+        <div>開始: <span id="metaStart">—</span></div>
+        <div>最終イベント: <span id="metaLast">—</span></div>
+        <div>合計経過: <span id="metaElapsed">—</span></div>
+        <div>最大の沈黙: <span id="metaGap">—</span></div>
+      </div>
+      <div class="mt-3 text-[10px] uppercase tracking-wider text-blue-200/60 mb-1">期待される次のイベント</div>
+      <div id="metaNext" class="text-xs text-blue-100/70 break-words">—</div>
+    </div>
+  </section>
+
+  <!-- Mermaid raw + JSON -->
+  <details class="stage-wrap p-4 hidden" id="rawDetails">
+    <summary class="text-xs text-blue-200/70"><i class="fa-solid fa-code mr-1"></i>Mermaid シーケンス図 / Raw JSON</summary>
+    <div class="mt-3 grid md:grid-cols-2 gap-3">
+      <div>
+        <div class="text-[10px] uppercase text-blue-200/60 mb-1">Mermaid（コピーして mermaid.live に貼り付け）</div>
+        <pre id="mermaidPre" class="mono text-[11px] bg-black/40 border border-white/10 rounded-lg p-3 max-h-72 overflow-auto"></pre>
+      </div>
+      <div>
+        <div class="text-[10px] uppercase text-blue-200/60 mb-1">/story レスポンス</div>
+        <pre id="rawJson" class="mono text-[11px] bg-black/40 border border-white/10 rounded-lg p-3 max-h-72 overflow-auto"></pre>
+      </div>
+    </div>
+  </details>
+
+  <!-- Empty state -->
+  <section id="emptyState" class="stage-wrap p-12 text-center curtain">
+    <div class="text-5xl mb-3 text-blue-200/40"><i class="fa-solid fa-masks-theater"></i></div>
+    <div class="text-blue-100 text-base mb-1">取引を選ぶと、その一生が幕を開けます</div>
+    <div class="text-blue-200/50 text-xs">FinalityLog のイベント列を、各アクターの動きと矢印で再生します。</div>
+  </section>
+
+</main>
+
+<script>
+// =============================================================================
+// State
+// =============================================================================
+const state = {
+  txList: [],            // [{txid, lane, state, ...}]
+  laneFilter: 'ALL',
+  storyData: null,       // /story API response
+  scenes: [],            // [{ts, kind, from?, to?, over?, label, eventIdx, blurb}]
+  cursor: 0,             // current scene index (0..scenes.length)
+  playing: false,
+  speed: 1,              // 0.5/1/2/4
+  loop: false,
+  condense: true,
+  timer: null,
+  bankByCode: new Map(), // bank_id → bank_name
+};
+
+// EVENT_RENDER (mirrors src/zc/query/story.ts).
+// Each entry maps a FinalityLog event_type to one or more arrows/notes.
+const EVENT_RENDER = {
+  PaymentInitiated: [{kind:'msg', from:'Customer', to:'ZC', text:'送金リクエスト'}],
+  PreCheckPassed:   [{kind:'note', over:['ZC'], text:'事前検証 OK', tone:'ok'}],
+  PreCheckFailed:   [{kind:'note', over:['ZC'], text:'事前検証 NG', tone:'warn'}],
+  HReserved:        [
+    {kind:'msg', from:'ZC', to:'PayerBank', text:'reserve_funds'},
+    {kind:'msg', from:'PayerBank', to:'ZC', text:'RESERVED', dashed:true},
+  ],
+  DecidedToSettle:  [{kind:'note', over:['ZC'], text:'決済確定を判断'}],
+  DecidedCancel:    [{kind:'note', over:['ZC'], text:'中止を判断', tone:'warn'}],
+  PayerExecConfirmed: [{kind:'msg', from:'PayerBank', to:'ZC', text:'出金完了 (proof a)', dashed:true}],
+  PayeeExecConfirmed: [{kind:'msg', from:'PayeeBank', to:'ZC', text:'入金完了 (proof b)', dashed:true}],
+  Settled:          [{kind:'note', over:['ZC','PayeeBank'], text:'SETTLED', tone:'ok'}],
+  Cancelled:        [{kind:'note', over:['ZC'], text:'CANCELLED', tone:'warn'}],
+  Suspended:        [{kind:'note', over:['ZC'], text:'⚠ SUSPENDED', tone:'warn'}],
+  FailedExecution:  [{kind:'note', over:['ZC'], text:'✗ FAILED', tone:'warn'}],
+  HtlcCreated:      [{kind:'note', over:['ZC'], text:'HTLC 作成'}],
+  HtlcLocked:       [
+    {kind:'msg', from:'ZC', to:'PayerBank', text:'lock_funds'},
+    {kind:'msg', from:'PayerBank', to:'ZC', text:'LOCKED', dashed:true},
+  ],
+  HtlcFulfillRequested: [{kind:'msg', from:'PayeeBank', to:'ZC', text:'preimage 提示'}],
+  HtlcCancelled:    [{kind:'note', over:['ZC'], text:'HTLC 取消', tone:'warn'}],
+  FilterPending:    [{kind:'msg', from:'ZC', to:'Customer', text:'着金承認待ち'}],
+  FilterRejected:   [{kind:'msg', from:'PayeeBank', to:'ZC', text:'filter REJECT', dashed:true, tone:'warn'}],
+  ApprovalGranted:  [{kind:'msg', from:'Customer', to:'PayeeBank', text:'承認', tone:'ok'}],
+  ApprovalDenied:   [{kind:'msg', from:'Customer', to:'PayeeBank', text:'拒否', tone:'warn'}],
+  CreditNotificationAttempted: [{kind:'note', over:['ZC'], text:'通知配信試行'}],
+  GtidRegistered:   [{kind:'note', over:['ZC'], text:'GTID 登録'}],
+  GtidDecided:      [{kind:'note', over:['ZC'], text:'GTID 確定', tone:'ok'}],
+  GtidSettled:      [{kind:'note', over:['ZC','PayerBank','PayeeBank'], text:'GTID SETTLED', tone:'ok'}],
+  RtpRequested:     [{kind:'msg', from:'PayeeBank', to:'ZC', text:'RTP 発行'}],
+  HtlcAuthRequested:[{kind:'msg', from:'PayeeBank', to:'ZC', text:'auth request'}],
+  HtlcAuthApproved: [{kind:'msg', from:'PayerBank', to:'ZC', text:'auth approve', tone:'ok', dashed:true}],
+  HtlcAuthDeclined: [{kind:'msg', from:'PayerBank', to:'ZC', text:'auth decline', tone:'warn', dashed:true}],
+  HtlcCaptured:     [{kind:'msg', from:'PayeeBank', to:'ZC', text:'capture'}],
+  HtlcVoided:       [{kind:'note', over:['ZC'], text:'auth void', tone:'warn'}],
+  DnsKicked:        [{kind:'note', over:['ZC'], text:'DNS kick'}],
+  DnsSettled:       [{kind:'note', over:['ZC'], text:'DNS settled', tone:'ok'}],
+  DnsHoldActivated: [{kind:'note', over:['ZC'], text:'DNS HOLD', tone:'warn'}],
+};
+
+// Static columns
+const ACTORS = ['Customer','PayerBank','ZC','PayeeBank','IGS'];
+
+// =============================================================================
+// API
+// =============================================================================
+async function api(path) {
+  // Party-scoped reads need an identified subject + purpose code (S-5/S-7,
+  // docs/specs/32_api_contracts.md § 照会の認可). This is an operator view.
+  const secret = sessionStorage.getItem('zenith_cron_secret');
+  const headers = { 'Accept':'application/json', 'X-Purpose-Code': 'P06' };
+  if (secret) headers['X-Cron-Secret'] = secret;
+  const r = await fetch(path, { headers });
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  return r.json();
+}
+
+// =============================================================================
+// Bank name lookup
+// =============================================================================
+async function loadBanks() {
+  try {
+    const r = await api('/api/banks');
+    (r.banks || []).forEach(b => state.bankByCode.set(String(b.bank_id), b.bank_name || b.bank_id));
+  } catch (_) {}
+}
+
+function bankName(id) {
+  if (!id) return '?';
+  return state.bankByCode.get(String(id)) || `銀行 ${id}`;
+}
+
+// =============================================================================
+// Loading & picking
+// =============================================================================
+async function loadTxList() {
+  const sel = document.getElementById('txPicker');
+  sel.innerHTML = '<option>— 取得中 —</option>';
+  try {
+    const r = await api('/api/transactions?limit=200');
+    state.txList = r.transactions || [];
+    populatePicker();
+    return state.txList;
+  } catch (e) {
+    sel.innerHTML = `<option>取得失敗: ${e.message}</option>`;
+    return [];
+  }
+}
+
+function populatePicker() {
+  const sel = document.getElementById('txPicker');
+  let txs = state.txList;
+  if (state.laneFilter === 'STUCK') {
+    txs = txs.filter(t => ['SUSPENDED','FAIL_DEBIT','FAIL_CREDIT','PRECHECKED_SUSPENDED'].includes(t.state));
+  } else if (state.laneFilter !== 'ALL') {
+    txs = txs.filter(t => t.lane === state.laneFilter);
+  }
+  if (!txs.length) {
+    sel.innerHTML = '<option value="">— 該当なし —</option>';
+    return;
+  }
+  sel.innerHTML = '<option value="">— 取引を選ぶ —</option>' + txs.slice(0, 200).map(t => {
+    const amt = t.amount_value ? `¥${Number(t.amount_value).toLocaleString()}` : '';
+    const short = t.txid.length > 22 ? t.txid.slice(0,22)+'…' : t.txid;
+    return `<option value="${t.txid}">[${t.lane}] ${short} · ${t.state} · ${amt}</option>`;
+  }).join('');
+}
+
+function shuffle() {
+  const sel = document.getElementById('txPicker');
+  const opts = Array.from(sel.options).filter(o => o.value);
+  if (!opts.length) return;
+  const pick = opts[Math.floor(Math.random() * opts.length)];
+  sel.value = pick.value;
+  loadStory(pick.value);
+}
+
+// =============================================================================
+// Story → scenes
+// =============================================================================
+async function loadStory(txid) {
+  if (!txid) return;
+  try {
+    const story = await api(`/api/transactions/${encodeURIComponent(txid)}/story`);
+    state.storyData = story;
+    state.scenes = buildScenes(story);
+    state.cursor = 0;
+    renderHeader(story);
+    renderEmptyStateGone();
+    renderStage(story);
+    renderNarration(story);
+    renderRaw(story);
+    pause();
+    updateScrubber();
+    play(); // auto-play on load
+  } catch (e) {
+    document.getElementById('emptyState').innerHTML =
+      `<div class="text-red-300 text-sm">取得失敗: ${e.message}</div>`;
+  }
+}
+
+/**
+ * Convert story.timeline → flat scene list. Each timeline event may produce
+ * multiple "scenes" (e.g. HReserved = 2 arrows). Each scene carries its
+ * source event index so the narration can highlight in sync.
+ */
+function buildScenes(story) {
+  const scenes = [];
+  const tl = story.timeline || [];
+  for (let i = 0; i < tl.length; i++) {
+    const ev = tl[i];
+    const renders = EVENT_RENDER[ev.event] || [{kind:'note', over:['ZC'], text: ev.event}];
+    for (let j = 0; j < renders.length; j++) {
+      const r = renders[j];
+      scenes.push({
+        ts: ev.at,
+        kind: r.kind,
+        from: r.from, to: r.to, over: r.over,
+        label: r.text,
+        dashed: !!r.dashed,
+        tone: r.tone,
+        eventIdx: i,
+        eventName: ev.event,
+        stateTo: ev.state_to,
+      });
+    }
+  }
+  return scenes;
+}
+
+// =============================================================================
+// Rendering
+// =============================================================================
+function renderEmptyStateGone() {
+  document.getElementById('emptyState').classList.add('hidden');
+  document.getElementById('txInfo').classList.remove('hidden');
+  document.getElementById('stageSection').classList.remove('hidden');
+  document.getElementById('narrationSection').classList.remove('hidden');
+  document.getElementById('rawDetails').classList.remove('hidden');
+}
+
+function renderHeader(story) {
+  const p = story.parties || {};
+  document.getElementById('laneChip').textContent = story.lane || '—';
+  document.getElementById('laneChip').className = `chip lane-${story.lane || 'EXPRESS'}`;
+  document.getElementById('txidLabel').textContent = story.txid;
+  const amt = story.timeline && story.timeline[0] && story.timeline[0].payload
+    ? '' : '';
+  // amount comes from explain endpoint shape — we have it via separate fetch is overkill.
+  // The /story endpoint does not include amount directly; fetch from /api/transactions/:id
+  // for display.
+  document.getElementById('txAmount').textContent = '—';
+  document.getElementById('txParties').textContent =
+    `${bankName(p.payer_bank_id)} → ${bankName(p.payee_bank_id)}`;
+  document.getElementById('payerBankName').textContent = bankName(p.payer_bank_id);
+  document.getElementById('payeeBankName').textContent = bankName(p.payee_bank_id);
+
+  // Health badge
+  const h = story.health || {};
+  const hb = document.getElementById('healthBadge');
+  const map = {
+    OK: ['順調', 'badge-state-ok'],
+    WATCH: ['見守り', 'badge-state-watch'],
+    STUCK: ['停滞', 'badge-state-stuck'],
+    TERMINAL: ['終局', 'badge-state-term'],
+  };
+  const [text, cls] = map[h.status] || ['—','badge-state-term'];
+  hb.textContent = `${text} (${story.current_state})`;
+  hb.className = 'badge ' + cls;
+  document.getElementById('healthMsg').textContent = h.message || '';
+
+  // Chain integrity
+  const ig = story.integrity || {};
+  const cb = document.getElementById('chainBadge');
+  if (ig.chain_verified) {
+    cb.textContent = `🔒 chain ✓ (${ig.entries_checked})`;
+    cb.className = 'badge badge-state-ok';
+  } else {
+    cb.textContent = `⚠ chain BROKEN`;
+    cb.className = 'badge badge-state-stuck';
+  }
+
+  // Narrative paragraph + meta
+  document.getElementById('narrativePara').textContent = story.narrative || '';
+  const pacing = story.pacing || {};
+  document.getElementById('metaStart').textContent = fmtJST(pacing.started_at);
+  document.getElementById('metaLast').textContent = fmtJST(pacing.last_event_at);
+  document.getElementById('metaElapsed').textContent = pacing.elapsed_ms != null ? formatGap(pacing.elapsed_ms) : '—';
+  document.getElementById('metaGap').textContent = pacing.longest_gap
+    ? `${pacing.longest_gap.from_event} → ${pacing.longest_gap.to_event}（${formatGap(pacing.longest_gap.gap_ms)}）`
+    : '—';
+  document.getElementById('metaNext').textContent = (h.next_expected || []).join(' / ') || '（なし）';
+
+  // Try to fetch the amount (best-effort)
+  fetch(`/api/transactions/${encodeURIComponent(story.txid)}`).then(r => r.ok ? r.json() : null).then(j => {
+    const tx = j && (j.transaction || j);
+    if (!tx) return;
+    if (tx.amount_value != null) {
+      document.getElementById('txAmount').textContent =
+        `${(tx.amount_currency==='JPY')?'¥':''}${Number(tx.amount_value).toLocaleString()}${(tx.amount_currency==='JPY')?'':' '+tx.amount_currency}`;
+    }
+  }).catch(()=>{});
+}
+
+function renderStage(story) {
+  const scenesEl = document.getElementById('scenes');
+  scenesEl.innerHTML = ''; // build empty rows first; reveal as cursor advances
+  const rowH = 64;
+  for (let i = 0; i < state.scenes.length; i++) {
+    const s = state.scenes[i];
+    const row = document.createElement('div');
+    row.className = 'scene-row';
+    row.style.height = rowH + 'px';
+    row.dataset.idx = i;
+    row.style.opacity = '0';
+    // timestamp
+    const ts = document.createElement('div');
+    ts.className = 'ts';
+    ts.textContent = shortTime(s.ts);
+    row.appendChild(ts);
+
+    // Build the visual element inside the row, positioned by column
+    const colW = 100 / 5; // %
+    const center = (actorIdx) => `${colW * actorIdx + colW/2}%`;
+
+    if (s.kind === 'msg') {
+      const fromIdx = ACTORS.indexOf(s.from);
+      const toIdx = ACTORS.indexOf(s.to);
+      if (fromIdx < 0 || toIdx < 0) continue;
+      const left = Math.min(fromIdx, toIdx);
+      const right = Math.max(fromIdx, toIdx);
+      const leftPct = colW * left + colW/2;
+      const widthPct = (right - left) * colW;
+      const reverse = fromIdx > toIdx;
+
+      const line = document.createElement('div');
+      line.className = 'arrow-line' + (s.dashed ? ' dashed' : '');
+      line.style.left = leftPct + '%';
+      line.style.width = widthPct + '%';
+      line.style.transform = 'translateY(-50%) scaleX(0)';
+      if (reverse) line.style.transformOrigin = 'right center';
+      row.appendChild(line);
+
+      const tip = document.createElement('div');
+      tip.className = 'arrow-tip' + (reverse ? ' left' : '');
+      tip.style.left = (reverse ? leftPct : (leftPct + widthPct)) + '%';
+      row.appendChild(tip);
+
+      const lbl = document.createElement('div');
+      lbl.className = 'arrow-label';
+      lbl.textContent = s.label;
+      lbl.style.left = (leftPct + widthPct/2) + '%';
+      lbl.style.top = '6px';
+      row.appendChild(lbl);
+    } else {
+      // note — span the listed actors
+      const idxs = (s.over || ['ZC']).map(a => ACTORS.indexOf(a)).filter(i=>i>=0).sort();
+      if (!idxs.length) continue;
+      const left = idxs[0], right = idxs[idxs.length-1];
+      const leftPct = colW * left + colW*.2;
+      const widthPct = colW * (right - left) + colW*.6;
+      const note = document.createElement('div');
+      note.className = 'note-bubble' + (s.tone === 'warn' ? ' warn' : (s.tone === 'ok' ? ' ok' : ''));
+      note.style.left = (leftPct + widthPct/2) + '%';
+      note.style.minWidth = widthPct + '%';
+      note.style.maxWidth = (widthPct + 5) + '%';
+      note.textContent = s.label;
+      row.appendChild(note);
+    }
+    scenesEl.appendChild(row);
+  }
+  // Size the stage container and stretch each actor column so the lifelines
+  // (positioned absolutely inside .actor-col) extend the full height.
+  const stageH = Math.max(400, Math.min(state.scenes.length * 64, 480));
+  const grid = document.getElementById('scenes').parentElement;
+  grid.style.minHeight = stageH + 'px';
+  grid.querySelectorAll('.actor-col').forEach(c => { c.style.height = stageH + 'px'; });
+}
+
+function renderNarration(story) {
+  const stream = document.getElementById('narrationStream');
+  stream.innerHTML = '';
+  const tl = story.timeline || [];
+  for (let i = 0; i < tl.length; i++) {
+    const ev = tl[i];
+    const div = document.createElement('div');
+    div.className = 'narration-line';
+    div.dataset.eventIdx = i;
+    div.innerHTML = `<span class="text-blue-200/50 mono mr-2">${shortTime(ev.at)}</span>` +
+      `<span class="font-medium">${ev.event}</span>` +
+      `<span class="text-blue-200/60 ml-2">${ev.reason || ''}</span>` +
+      (ev.state_to ? `<span class="ml-2 text-[10px] text-blue-200/50">→ ${ev.state_to}</span>` : '');
+    stream.appendChild(div);
+  }
+}
+
+function renderRaw(story) {
+  document.getElementById('mermaidPre').textContent = story.mermaid_sequence || '';
+  document.getElementById('rawJson').textContent = JSON.stringify(story, null, 2);
+}
+
+// =============================================================================
+// Playback
+// =============================================================================
+function gapBefore(idx) {
+  // Real-world ms gap between scene[idx] and previous scene (clamped & condensed)
+  if (idx <= 0) return 200;
+  const prev = state.scenes[idx-1];
+  const curr = state.scenes[idx];
+  if (!prev || !curr) return 400;
+  // Same-event sub-arrows: short fixed delay
+  if (prev.eventIdx === curr.eventIdx) return 350;
+  let real = Math.max(0, Date.parse(curr.ts) - Date.parse(prev.ts));
+  if (state.condense) {
+    // logarithmic squash so multi-minute idle gaps don't kill the viewing experience
+    real = Math.min(2500, Math.round(400 + Math.log2(1 + real/100) * 220));
+  } else {
+    real = Math.min(8000, real);
+  }
+  return real;
+}
+
+function tick() {
+  if (state.cursor >= state.scenes.length) {
+    if (state.loop) {
+      reset();
+      state.timer = setTimeout(tick, 600);
+      return;
+    }
+    pause();
+    return;
+  }
+  revealScene(state.cursor);
+  state.cursor++;
+  updateScrubber();
+  const baseGap = gapBefore(state.cursor);
+  const adj = Math.max(120, baseGap / state.speed);
+  state.timer = setTimeout(tick, adj);
+}
+
+function revealScene(idx) {
+  const row = document.querySelector(`#scenes .scene-row[data-idx="${idx}"]`);
+  if (!row) return;
+  row.style.transition = 'opacity .25s';
+  row.style.opacity = '1';
+  // animate inner elements
+  requestAnimationFrame(() => {
+    row.querySelectorAll('.arrow-line').forEach(el => el.classList.add('show'));
+    row.querySelectorAll('.arrow-line').forEach(el => { el.style.transform = 'translateY(-50%) scaleX(1)'; });
+    row.querySelectorAll('.arrow-tip').forEach(el => el.classList.add('show'));
+    row.querySelectorAll('.arrow-label').forEach(el => el.classList.add('show'));
+    row.querySelectorAll('.note-bubble').forEach(el => el.classList.add('show'));
+  });
+  // Highlight active actors
+  const s = state.scenes[idx];
+  highlightActors(s.kind === 'msg' ? [s.from, s.to] : (s.over || []));
+  // sync narration scroll
+  highlightNarration(s.eventIdx);
+  // scroll into view
+  const cont = document.getElementById('scenes');
+  const targetTop = row.offsetTop - cont.clientHeight / 2 + row.clientHeight / 2;
+  cont.scrollTo({ top: Math.max(0, targetTop), behavior: 'smooth' });
+}
+
+function highlightActors(actors) {
+  document.querySelectorAll('.actor-col').forEach(col => col.classList.remove('actor-active'));
+  for (const a of actors) {
+    const col = document.querySelector(`.actor-col[data-actor="${a}"]`);
+    if (col) {
+      col.classList.add('actor-active');
+      const card = col.querySelector('.actor-card');
+      if (card) {
+        card.classList.remove('actor-pulse');
+        // re-trigger
+        void card.offsetWidth;
+        card.classList.add('actor-pulse');
+      }
+    }
+  }
+}
+
+function highlightNarration(eventIdx) {
+  const stream = document.getElementById('narrationStream');
+  stream.querySelectorAll('.narration-line').forEach(el => {
+    el.classList.remove('active', 'past');
+    const i = parseInt(el.dataset.eventIdx);
+    if (i === eventIdx) el.classList.add('active');
+    else if (i < eventIdx) el.classList.add('past');
+  });
+  const active = stream.querySelector('.narration-line.active');
+  if (active) {
+    active.scrollIntoView({ block:'nearest', behavior:'smooth' });
+  }
+}
+
+function play() {
+  if (state.playing) return;
+  if (!state.scenes.length) return;
+  state.playing = true;
+  document.getElementById('btnPlay').innerHTML = '<i class="fa-solid fa-pause mr-1"></i>一時停止';
+  if (state.cursor >= state.scenes.length) reset();
+  state.timer = setTimeout(tick, 200);
+}
+function pause() {
+  state.playing = false;
+  if (state.timer) { clearTimeout(state.timer); state.timer = null; }
+  document.getElementById('btnPlay').innerHTML = '<i class="fa-solid fa-play mr-1"></i>再生';
+}
+function step() {
+  if (state.cursor < state.scenes.length) {
+    revealScene(state.cursor);
+    state.cursor++;
+    updateScrubber();
+  }
+}
+function reset() {
+  state.cursor = 0;
+  document.querySelectorAll('#scenes .scene-row').forEach(r => {
+    r.style.opacity = '0';
+    r.querySelectorAll('.show').forEach(el => el.classList.remove('show'));
+    r.querySelectorAll('.arrow-line').forEach(el => { el.style.transform = 'translateY(-50%) scaleX(0)'; });
+  });
+  document.querySelectorAll('.actor-col').forEach(c => c.classList.remove('actor-active'));
+  document.querySelectorAll('.narration-line').forEach(el => el.classList.remove('active','past'));
+  document.getElementById('scenes').scrollTo({ top: 0, behavior: 'smooth' });
+  updateScrubber();
+}
+
+function updateScrubber() {
+  const s = document.getElementById('scrubber');
+  s.max = state.scenes.length;
+  s.value = state.cursor;
+  document.getElementById('sceneCounter').textContent = `${state.cursor} / ${state.scenes.length}`;
+}
+
+function seek(idx) {
+  pause();
+  // reset, then fast-forward without animation
+  state.cursor = 0;
+  document.querySelectorAll('#scenes .scene-row').forEach(r => {
+    r.style.opacity = '0';
+    r.querySelectorAll('.show').forEach(el => el.classList.remove('show'));
+    r.querySelectorAll('.arrow-line').forEach(el => { el.style.transform = 'translateY(-50%) scaleX(0)'; });
+  });
+  for (let i = 0; i < idx; i++) {
+    const row = document.querySelector(`#scenes .scene-row[data-idx="${i}"]`);
+    if (!row) continue;
+    row.style.opacity = '1';
+    row.querySelectorAll('.arrow-line').forEach(el => { el.classList.add('show'); el.style.transform='translateY(-50%) scaleX(1)'; });
+    row.querySelectorAll('.arrow-tip').forEach(el => el.classList.add('show'));
+    row.querySelectorAll('.arrow-label').forEach(el => el.classList.add('show'));
+    row.querySelectorAll('.note-bubble').forEach(el => el.classList.add('show'));
+  }
+  state.cursor = idx;
+  if (idx > 0) {
+    const last = state.scenes[idx - 1];
+    if (last) highlightNarration(last.eventIdx);
+  }
+  updateScrubber();
+}
+
+// =============================================================================
+// Helpers
+// =============================================================================
+function fmtJST(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return iso;
+  return d.toLocaleString('ja-JP', { hour12:false });
+}
+function shortTime(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return iso;
+  return d.toLocaleTimeString('ja-JP', { hour12:false }) + '.' + String(d.getMilliseconds()).padStart(3,'0');
+}
+function formatGap(ms) {
+  if (ms < 1000) return `${ms} ミリ秒`;
+  if (ms < 60000) return `${(Math.round(ms/100)/10)} 秒`;
+  if (ms < 3600000) return `${(Math.round(ms/6000)/10)} 分`;
+  return `${(Math.round(ms/360000)/10)} 時間`;
+}
+
+// =============================================================================
+// Wiring
+// =============================================================================
+document.getElementById('btnReload').addEventListener('click', loadTxList);
+document.getElementById('btnShuffle').addEventListener('click', shuffle);
+document.getElementById('txPicker').addEventListener('change', e => loadStory(e.target.value));
+document.getElementById('btnPlay').addEventListener('click', () => state.playing ? pause() : play());
+document.getElementById('btnStep').addEventListener('click', () => { pause(); step(); });
+document.getElementById('btnReset').addEventListener('click', () => { pause(); reset(); });
+document.getElementById('loopChk').addEventListener('change', e => state.loop = e.target.checked);
+document.getElementById('condenseChk').addEventListener('change', e => state.condense = e.target.checked);
+document.getElementById('scrubber').addEventListener('input', e => seek(parseInt(e.target.value)));
+document.querySelectorAll('.speed-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    state.speed = parseFloat(btn.dataset.speed);
+    document.querySelectorAll('.speed-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    btn.style.background = 'linear-gradient(135deg,#1d4ea8,#0b66cc)';
+    document.querySelectorAll('.speed-btn').forEach(b => { if (b !== btn) b.style.background = ''; });
+  });
+});
+document.querySelectorAll('#laneFilter button[data-lf]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    state.laneFilter = btn.dataset.lf;
+    document.querySelectorAll('#laneFilter button').forEach(b => b.classList.remove('primary'));
+    btn.classList.add('primary');
+    populatePicker();
+  });
+});
+
+// keyboard shortcuts
+document.addEventListener('keydown', e => {
+  if (['INPUT','SELECT','TEXTAREA'].includes(document.activeElement?.tagName)) return;
+  if (e.key === ' ') { e.preventDefault(); state.playing ? pause() : play(); }
+  else if (e.key === 'ArrowRight') { pause(); step(); }
+  else if (e.key === 'ArrowLeft') { pause(); seek(Math.max(0, state.cursor - 1)); }
+  else if (e.key.toLowerCase() === 'r') { pause(); reset(); }
+  else if (e.key.toLowerCase() === 's') { shuffle(); }
+});
+
+// init: deep-link via ?txid=... (e.g. from the dashboard's trace modal)
+const initialTxid = new URLSearchParams(location.search).get('txid');
+loadBanks();
+loadTxList().then(() => {
+  if (initialTxid) {
+    const sel = document.getElementById('txPicker');
+    // Add the deep-linked txid as an option even if it's not in the recent list
+    if (![...sel.options].some(o => o.value === initialTxid)) {
+      const opt = document.createElement('option');
+      opt.value = initialTxid;
+      opt.textContent = `[deep-link] ${initialTxid}`;
+      sel.appendChild(opt);
+    }
+    sel.value = initialTxid;
+    loadStory(initialTxid);
+  }
+});
+</script>
+</body>
+</html>

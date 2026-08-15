@@ -1,0 +1,96 @@
+name = "zenith-coordinator"
+main = "src/index.ts"
+compatibility_date = "2024-12-01"
+compatibility_flags = ["nodejs_compat"]
+
+# ── 秘密情報の扱い ───────────────────────────────────────────────────
+# このファイル（および実ファイル wrangler.toml）に秘密情報を直接書いてはいけない。
+# パブリックリポジトリでは公開直後からクローラーに読まれる。
+#
+#   ローカル開発: `.dev.vars` を作成し `KEY="value"` の形で書く（`.gitignore` 済み。
+#                 `wrangler dev` が自動で読み込む）。ひな型は `.dev.vars.example`。
+#   本番:         Cloudflare Dashboard → Workers & Pages → 対象Worker →
+#                 Settings → Variables で「Secret」として登録するか、
+#                 `wrangler secret put <NAME>` を実行する。
+#                 いずれもこの toml には値が残らない。
+#
+# コード側は環境の出所に関わらず同じ `env.<NAME>` で読む（例: src/shared/hmac.ts）。
+#
+# 対象（すべて .dev.vars / secret 側で管理し、ここには置かない）:
+#   ZC_HMAC_SECRET                共有 HMAC 署名鍵（現行）
+#   ZC_HMAC_SECRET_PREVIOUS       共有 HMAC のローテーション重複窓・旧鍵
+#                                 （src/shared/secret_rotation.ts。検証のみ・期限まで受理）
+#   ZC_HMAC_SECRET_PREVIOUS_UNTIL 上記の期限（ISO8601）。値自体は秘密ではないが
+#                                 ローテーション操作として旧鍵と対で設定・削除するため同じ経路で管理する
+#   CRON_SECRET                   /internal 系エンドポイントの運営認証
+#   QR_SECRET                     QR コード発行の署名鍵
+#   ZC_ADMIN_KEY                  管理系エンドポイントの認証（未設定時は ZC_HMAC_SECRET にフォールバック）
+#   ZC_SIGNING_KEY_ID             ZC 非対称署名の鍵ID（src/shared/zc_signature.ts）
+#   ZC_SIGNING_KEY_PKCS8          ZC 非対称署名の秘密鍵（PKCS8）。未設定時は共有 HMAC にフォールバック
+#   ZC_SIGNING_ALGO               上記の署名アルゴリズム指定（任意）
+# ─────────────────────────────────────────────────────────────────────
+
+[vars]
+BANK_BASE_URL    = ""   # same-Worker呼び出し。空文字 = 内部ルーティング
+# 同梱デモ用 UI から鍵なしで取引（/api/* の POST 含む）できるようにする（既定 off）。
+# 「UI から鍵なしで取引する」ための公式かつ唯一の経路——同一オリジン限定・1 リクエスト
+# ごとにログ。隠れた迂回路（バックドア）は設けない：参照リファレンスはコピーされるため、
+# 鍵なし経路は必ず明示・opt-in・可視に留める。これはセキュリティ機構ではなく、有効にした
+# 配備は API を公開したことになる。本番では設定しないこと（docs/specs/30_internal_design.md §12.6.5）。
+# ZC_ALLOW_UNAUTHENTICATED_UI = "true"
+
+# D1 database
+# `wrangler d1 create zenith-db` を実行後、出力された database_id を貼り付ける
+[[d1_databases]]
+binding       = "DB"
+database_name = "zenith-db"
+database_id   = "YOUR_DATABASE_ID"
+
+# Cloudflare Queues
+[[queues.producers]]
+binding = "QUEUE"
+queue   = "zenith-coordinator-queue"
+
+[[queues.consumers]]
+queue             = "zenith-coordinator-queue"
+max_batch_size    = 10
+max_batch_timeout = 5
+max_retries       = 3
+
+# R2 bucket（証跡・Vault の将来拡張用）
+[[r2_buckets]]
+binding     = "R2"
+bucket_name = "zenith-coordinator-r2"
+
+# R2_BUCKET = RichData のしきい値超過ペイロード退避先
+#             (src/zc/richdata/richdata.ts)
+[[r2_buckets]]
+binding     = "R2_BUCKET"
+bucket_name = "zenith-coordinator-richdata"
+
+# KV namespace
+#   ALS_KV = ALS（エイリアス解決）キャッシュ (src/zc/directory/als.ts)
+# `wrangler kv namespace create ALS_KV` の出力 id を貼り付ける
+[[kv_namespaces]]
+binding = "ALS_KV"
+id      = "YOUR_KV_NAMESPACE_ID"
+
+# Durable Objects
+#   STREAM_DO = Rafiki/Interledger STREAM micro-payment aggregator
+#               (src/zc/events/stream_rafiki.ts) — fronts GET /api/stream/connect
+[[durable_objects.bindings]]
+name       = "STREAM_DO"
+class_name = "StreamDO"
+
+# DO migrations. The class persists via `state.storage`, so it requires the
+# SQLite-backed storage backend declared through `new_sqlite_classes`.
+[[migrations]]
+tag                = "v1"
+new_sqlite_classes = ["StreamDO"]
+
+# Cron triggers
+[triggers]
+crons = [
+  "30 7 * * *",   # 毎日 16:30 JST = 07:30 UTC → EOD
+  "* * * * *",    # 毎分 → timeout sweep
+]

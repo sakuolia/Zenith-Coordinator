@@ -1,0 +1,10 @@
+{
+  "txid": "TX-TEST3A",
+  "schema_version": "1.0",
+  "lane": "EXPRESS",
+  "amount": { "value": 100, "currency": "JPY" },
+  "payer": { "bank_id": "001", "account_hash": "A" },
+  "payee": { "bank_id": "002", "account_hash": "B" },
+  "idempotency_key": "K3A",
+  "purpose": "MERCHANT"
+}

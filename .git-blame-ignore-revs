@@ -1,0 +1,16 @@
+# Revisions to skip when running `git blame`.
+#
+# Only bulk, mechanically-generated, behaviour-preserving commits belong here —
+# repository-wide reformats and the like. Never add a commit that changes
+# behaviour: that would hide the very history someone is trying to find.
+#
+# Enable locally (once per clone):
+#
+#     git config blame.ignoreRevsFile .git-blame-ignore-revs
+#
+# GitHub applies this file automatically in its blame view.
+
+# style: apply biome format across src/ and test/ (no behaviour change)
+# 127 .ts files reformatted to match biome.json after the repo drifted from its
+# own formatter config. Verified inert: tsc clean, 1196 tests unchanged.
+993e662e80f9b4796195c0a4dcf52f2455885078

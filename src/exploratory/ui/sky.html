@@ -1,0 +1,868 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Zenith Sky — 決済の鼓動を、空に</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      fontFamily: {
+        jp: ['"Noto Sans JP"','"Hiragino Sans"','"Yu Gothic"','sans-serif'],
+        serif: ['"source-han-serif-japanese"','"Hiragino Mincho ProN"','"Yu Mincho"','serif'],
+      },
+    }
+  }
+}
+</script>
+<style>
+  html, body { height: 100%; margin: 0; }
+  body {
+    background:
+      radial-gradient(ellipse at top, #0a1730 0%, #050b1d 45%, #02030a 100%);
+    color: #d6e3ff;
+    overflow: hidden;
+  }
+  .mono { font-family: 'SF Mono','Consolas','Courier New',monospace; }
+  .glow { text-shadow: 0 0 12px rgba(140, 195, 255, .55); }
+
+  /* HUD chrome */
+  .hud { background: rgba(8, 16, 36, .55); border: 1px solid rgba(140,180,255,.18); border-radius: 12px; backdrop-filter: blur(8px); }
+  .hud-soft { background: rgba(8, 16, 36, .35); border: 1px solid rgba(140,180,255,.12); border-radius: 10px; }
+  .chip { display:inline-flex; align-items:center; gap:5px; padding:2px 8px; border-radius:999px; font-size:11px; }
+
+  /* Lane palette (mirrors theater.html) */
+  .lane-EXPRESS    { color:#7cc1ff; }
+  .lane-STANDARD   { color:#9bd3ff; }
+  .lane-HTLC       { color:#c9a9ff; }
+  .lane-HTLC_AUTH  { color:#dab2ff; }
+  .lane-GTID       { color:#86efac; }
+  .lane-RTP        { color:#7dd3fc; }
+  .lane-HIGH_VALUE { color:#fda4af; }
+  .lane-BULK       { color:#cbd5e1; }
+  .dot { width:8px; height:8px; border-radius:50%; box-shadow:0 0 6px currentColor; background: currentColor; display:inline-block; }
+
+  .toggle { cursor:pointer; user-select:none; }
+  .toggle.off { opacity:.35; }
+
+  /* Empty / overlay states */
+  .veil { background: radial-gradient(ellipse at center, rgba(20,40,80,.45), rgba(0,0,0,.0) 70%); }
+
+  /* Click target overlays for banks */
+  .bank-hit { position: absolute; transform: translate(-50%, -50%); width: 56px; height: 56px; border-radius: 50%; cursor: pointer; }
+  .bank-hit:hover { background: rgba(140, 200, 255, .08); }
+  .bank-tooltip { position: absolute; transform: translate(-50%, -100%); padding: 6px 10px; font-size: 11px; background: rgba(10,20,40,.92); border: 1px solid rgba(140,180,255,.3); border-radius: 8px; pointer-events: none; white-space: nowrap; box-shadow: 0 6px 18px rgba(0,0,0,.4); }
+
+  /* Pulse meter */
+  .meter-bar { background: linear-gradient(90deg, rgba(140,200,255,.15), rgba(140,200,255,.6)); height: 4px; border-radius: 4px; transition: width .4s ease; }
+
+  /* Subtle vignette */
+  .vignette::after {
+    content:''; position: fixed; inset:0; pointer-events:none;
+    background: radial-gradient(ellipse at center, rgba(0,0,0,0) 55%, rgba(0,0,0,.55) 100%);
+  }
+
+  /* Right rail tx list */
+  .tx-row { display:flex; gap:8px; align-items:center; font-size:11px; padding:4px 6px; border-radius:6px; }
+  .tx-row:hover { background: rgba(140,180,255,.08); cursor: pointer; }
+  .tx-row .ts { color: rgba(190,210,255,.5); width: 56px; }
+  .tx-row .lane { width: 70px; }
+  .tx-row .corridor { color: rgba(220,230,255,.85); flex: 1; }
+  .tx-row .state { font-size: 10px; padding: 1px 6px; border-radius: 999px; }
+  .state-OK    { background: rgba(120,255,180,.12); color:#9ff5bf; }
+  .state-WATCH { background: rgba(255,220,140,.12); color:#ffe09a; }
+  .state-STUCK { background: rgba(255,140,140,.15); color:#ffaaaa; }
+  .state-TERM  { background: rgba(160,180,220,.12); color:#cdd9ee; }
+
+  /* Selected bank highlight */
+  .bank-selected-ring { position: absolute; transform: translate(-50%, -50%); border: 1.5px solid rgba(180,220,255,.7); border-radius: 50%; box-shadow: 0 0 24px rgba(140,200,255,.45) inset, 0 0 24px rgba(140,200,255,.45); pointer-events: none; }
+
+  /* Heartbeat */
+  @keyframes heart { 0%,100% { transform: scale(1); opacity:.85;} 14% { transform: scale(1.18); opacity:1;} 28% { transform: scale(1); opacity:.85;} 42% { transform: scale(1.10); opacity:1;} 70% { transform: scale(1); opacity:.85;}}
+  .beat { animation: heart 1.6s ease infinite; transform-origin: center; }
+
+  .btn { background:rgba(30,50,90,.55); border:1px solid rgba(140,180,255,.22); color:#dde7ff; padding:5px 10px; border-radius:7px; font-size:11px; transition: all .15s; }
+  .btn:hover { background:rgba(50,80,130,.85); border-color: rgba(180,210,255,.5); }
+  .btn.primary { background: linear-gradient(135deg, #1d4ea8, #0b66cc); border-color: rgba(180,210,255,.45); }
+
+  /* Scrollbar */
+  .thin-scroll::-webkit-scrollbar { width:6px; }
+  .thin-scroll::-webkit-scrollbar-thumb { background:rgba(140,180,255,.18); border-radius:4px; }
+</style>
+</head>
+<body class="font-jp vignette">
+
+<!-- Top HUD -->
+<header class="fixed top-0 left-0 right-0 z-30 px-5 py-3 flex items-center justify-between gap-3">
+  <div class="flex items-center gap-3">
+    <div>
+      <div class="font-serif text-xl tracking-[0.25em] text-blue-100 glow">Zenith</div>
+      <div class="text-[10px] text-blue-200/60 tracking-[0.3em] uppercase">Sky · 決済の鼓動</div>
+    </div>
+    <span class="hidden md:inline text-xs text-blue-200/45">— 取引が今、空を流れる</span>
+  </div>
+  <div class="flex items-center gap-2 text-xs">
+    <span id="connBadge" class="chip" style="background:rgba(140,200,255,.08); border:1px solid rgba(140,200,255,.2);">
+      <span class="dot" style="color:#7ec8ff"></span> 接続中…
+    </span>
+    <a href="/" class="btn"><i class="fa-solid fa-arrow-left mr-1"></i>ダッシュボード</a>
+    <a href="/theater" class="btn"><i class="fa-solid fa-masks-theater mr-1"></i>シアター</a>
+  </div>
+</header>
+
+<!-- Left HUD: Pulse + Lane Legend + Settings -->
+<aside class="fixed left-4 top-20 bottom-4 w-64 z-20 flex flex-col gap-3">
+  <!-- Heartbeat -->
+  <section class="hud p-3">
+    <div class="flex items-center justify-between">
+      <div class="text-[10px] uppercase tracking-wider text-blue-200/60">脈拍</div>
+      <div class="text-[10px] text-blue-200/40 mono" id="pulseRate">— /min</div>
+    </div>
+    <div class="mt-2 flex items-end gap-2">
+      <div class="text-3xl font-light text-blue-50 mono" id="pulseValue">—</div>
+      <div class="text-xs text-blue-200/60 mb-1">直近60秒の鼓動</div>
+    </div>
+    <div class="mt-2 w-full h-1 rounded bg-white/5">
+      <div id="pulseBar" class="meter-bar" style="width: 0%"></div>
+    </div>
+    <div class="mt-3 flex items-center gap-2 text-[10px] text-blue-200/55">
+      <i id="heartIcon" class="fa-solid fa-heart text-pink-300/80 beat"></i>
+      <span>ネットワークが息をしています</span>
+    </div>
+  </section>
+
+  <!-- Lane legend / toggles -->
+  <section class="hud p-3">
+    <div class="flex items-center justify-between">
+      <div class="text-[10px] uppercase tracking-wider text-blue-200/60">レーン</div>
+      <button id="laneAll" class="text-[10px] text-blue-200/50 hover:text-blue-100">すべて</button>
+    </div>
+    <div id="laneLegend" class="mt-2 grid grid-cols-2 gap-1.5 text-[11px]"></div>
+  </section>
+
+  <!-- Anomaly -->
+  <section class="hud p-3">
+    <div class="text-[10px] uppercase tracking-wider text-blue-200/60">異常の気配</div>
+    <div class="mt-2 grid grid-cols-2 gap-2 text-xs">
+      <div class="hud-soft p-2 text-center">
+        <div class="text-[10px] text-blue-200/55">停滞</div>
+        <div class="text-xl mono text-amber-200" id="stuckCount">—</div>
+      </div>
+      <div class="hud-soft p-2 text-center">
+        <div class="text-[10px] text-blue-200/55">遮断</div>
+        <div class="text-xl mono text-rose-200" id="brokenCount">—</div>
+      </div>
+    </div>
+    <div id="anomalyDetail" class="mt-2 text-[11px] text-blue-200/70 leading-relaxed">—</div>
+  </section>
+
+  <!-- Settings -->
+  <section class="hud p-3">
+    <div class="text-[10px] uppercase tracking-wider text-blue-200/60">調整</div>
+    <div class="mt-2 space-y-2 text-[11px] text-blue-100/85">
+      <label class="flex items-center justify-between gap-2">
+        <span>更新間隔</span>
+        <select id="pollSel" class="bg-ink/60 border border-white/15 rounded px-2 py-0.5 text-xs">
+          <option value="3000">3 秒</option>
+          <option value="5000" selected>5 秒</option>
+          <option value="10000">10 秒</option>
+          <option value="30000">30 秒</option>
+        </select>
+      </label>
+      <label class="flex items-center justify-between gap-2">
+        <span>軌跡の余韻</span>
+        <select id="trailSel" class="bg-ink/60 border border-white/15 rounded px-2 py-0.5 text-xs">
+          <option value="0.06">短い</option>
+          <option value="0.04" selected>普通</option>
+          <option value="0.02">長い</option>
+        </select>
+      </label>
+      <label class="flex items-center justify-between gap-2">
+        <span>静寂モード</span>
+        <input id="quietChk" type="checkbox" class="accent-blue-300">
+      </label>
+    </div>
+    <div class="mt-3 text-[10px] text-blue-200/40 leading-snug">
+      静寂モードでは新しい流星のみが表示され、古い軌跡は速やかに消えます。
+    </div>
+  </section>
+</aside>
+
+<!-- Right HUD: Recent transactions list -->
+<aside class="fixed right-4 top-20 bottom-4 w-80 z-20 flex flex-col gap-3">
+  <section class="hud p-3 flex-1 flex flex-col min-h-0">
+    <div class="flex items-center justify-between">
+      <div class="text-[10px] uppercase tracking-wider text-blue-200/60" id="txListTitle">直近の流れ</div>
+      <span class="text-[10px] text-blue-200/40 mono" id="txListCount">0</span>
+    </div>
+    <div id="txList" class="mt-2 space-y-0.5 overflow-y-auto thin-scroll flex-1 pr-1"></div>
+    <div class="mt-2 pt-2 border-t border-white/10 text-[10px] text-blue-200/40">
+      行をクリックすると <span class="text-blue-100/80">シアター</span> で再生できます。
+    </div>
+  </section>
+</aside>
+
+<!-- The Sky -->
+<main class="absolute inset-0">
+  <canvas id="sky" class="absolute inset-0 w-full h-full"></canvas>
+  <div id="overlay" class="absolute inset-0"></div>
+
+  <!-- Empty / loading states -->
+  <div id="emptyHint" class="absolute inset-0 hidden items-center justify-center">
+    <div class="hud p-8 text-center max-w-md veil">
+      <div class="text-4xl mb-3 text-blue-200/40"><i class="fa-solid fa-moon"></i></div>
+      <div class="text-blue-100 text-base mb-1">空はまだ静かです</div>
+      <div class="text-blue-200/55 text-xs leading-relaxed">
+        ZC に取引がまだありません。<br>
+        <a href="/" class="text-blue-200/85 underline">ダッシュボード</a> または
+        <a href="/console" class="text-blue-200/85 underline">コンソール</a> から
+        いくつか送金を流してみてください。
+      </div>
+    </div>
+  </div>
+</main>
+
+<!-- Bottom strip: corridors -->
+<footer class="fixed bottom-3 left-72 right-84 z-20" style="left:18rem; right:21rem;">
+  <section class="hud p-2 flex items-center gap-3 overflow-hidden">
+    <div class="text-[10px] uppercase tracking-wider text-blue-200/60 px-1 shrink-0">主要な回廊</div>
+    <div id="corridorStrip" class="flex items-center gap-2 overflow-x-auto thin-scroll text-[11px] flex-1"></div>
+  </section>
+</footer>
+
+<script>
+// ============================================================================
+// Zenith Sky — ambient real-time visualization
+//
+// Watch the system breathe. Banks become stars; transactions become light
+// flowing between them. The center is the Zenith Coordinator. Activity in the
+// payment network becomes visceral, intuitive, observable.
+// ============================================================================
+
+// --- Constants ---------------------------------------------------------------
+const LANES = ['EXPRESS','STANDARD','HTLC','HTLC_AUTH','GTID','RTP','HIGH_VALUE','BULK'];
+const LANE_COLOR = {
+  EXPRESS:   { rgb:[124,193,255], label:'EXPRESS' },
+  STANDARD:  { rgb:[155,211,255], label:'STANDARD' },
+  HTLC:      { rgb:[201,169,255], label:'HTLC' },
+  HTLC_AUTH: { rgb:[218,178,255], label:'HTLC_AUTH' },
+  GTID:      { rgb:[134,239,172], label:'GTID' },
+  RTP:       { rgb:[125,211,252], label:'RTP' },
+  HIGH_VALUE:{ rgb:[253,164,175], label:'HIGH_VALUE' },
+  BULK:      { rgb:[203,213,225], label:'BULK' },
+};
+const STUCK_STATES = new Set(['SUSPENDED','FAIL_DEBIT','FAIL_CREDIT','PRECHECKED_SUSPENDED']);
+const TERMINAL_STATES = new Set(['SETTLED','CANCELLED','SETTLED_BY_DNS','HTLC_FULFILLED','HTLC_REFUNDED','VOIDED','CAPTURED','GTID_SETTLED']);
+const WATCH_STATES = new Set(['AWAITING_AUTHORIZATION','RESERVED','PRECHECKED','PENDING','LOCKED','REQUESTED','CREATED']);
+
+const state = {
+  banks: [],            // [{bank_id, bank_name, x, y, h_limit, h_used, is_active, recent: 0}]
+  bankByCode: new Map(),
+  txs: [],              // recent transactions (raw)
+  knownTxids: new Set(),
+  pulses: [],           // active flying particles
+  laneOn: new Map(LANES.map(l => [l, true])),
+  selectedBank: null,
+  pollMs: 5000,
+  trail: 0.04,
+  quiet: false,
+  pulseHistory: [],     // [{at}], last 60s
+  circuit: {},          // {bank_id: state}
+  zcCenter: { x: 0, y: 0 },
+  loading: true,
+  lastPollAt: 0,
+  pollErrors: 0,
+  initialFanInDone: false,
+  selfPulse: 0,
+};
+
+// --- Canvas ------------------------------------------------------------------
+const canvas = document.getElementById('sky');
+const ctx = canvas.getContext('2d');
+const overlay = document.getElementById('overlay');
+let dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+let stars = []; // background starfield
+
+function resize() {
+  dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+  canvas.width  = window.innerWidth * dpr;
+  canvas.height = window.innerHeight * dpr;
+  canvas.style.width  = window.innerWidth + 'px';
+  canvas.style.height = window.innerHeight + 'px';
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  buildStars();
+  layoutBanks();
+  renderBankOverlays();
+}
+window.addEventListener('resize', resize);
+
+function buildStars() {
+  stars = [];
+  const W = window.innerWidth, H = window.innerHeight;
+  const target = Math.min(280, Math.floor(W*H/9000));
+  for (let i = 0; i < target; i++) {
+    stars.push({
+      x: Math.random()*W, y: Math.random()*H,
+      r: Math.random()*1.2 + .15,
+      a: Math.random()*.55 + .15,
+      tw: Math.random()*0.02 + 0.004,
+      ph: Math.random()*Math.PI*2,
+    });
+  }
+}
+
+// --- Layout ------------------------------------------------------------------
+function layoutBanks() {
+  const W = window.innerWidth, H = window.innerHeight;
+  const cx = W/2, cy = H/2 + 8;
+  state.zcCenter.x = cx; state.zcCenter.y = cy;
+  const n = state.banks.length || 1;
+  // Adapt radius to viewport, leaving room for HUD panels.
+  const minSide = Math.min(W, H);
+  const radius = Math.max(180, Math.min(minSide/2 - 200, 360));
+  for (let i = 0; i < state.banks.length; i++) {
+    const angle = (-Math.PI/2) + (i / n) * Math.PI * 2;
+    state.banks[i].angle = angle;
+    state.banks[i].x = cx + Math.cos(angle) * radius;
+    state.banks[i].y = cy + Math.sin(angle) * radius;
+  }
+}
+
+// --- API ---------------------------------------------------------------------
+async function api(path) {
+  // Party-scoped reads need an identified subject + purpose code (S-5/S-7,
+  // docs/specs/32_api_contracts.md § 照会の認可). This is an operator view.
+  const secret = sessionStorage.getItem('zenith_cron_secret');
+  const headers = { 'Accept':'application/json', 'X-Purpose-Code': 'P06' };
+  if (secret) headers['X-Cron-Secret'] = secret;
+  const r = await fetch(path, { headers });
+  if (!r.ok) throw new Error(`${r.status}`);
+  return r.json();
+}
+
+async function loadBanks() {
+  try {
+    const r = await api('/api/banks');
+    const banks = (r.banks || []).map(b => ({
+      bank_id: String(b.bank_id),
+      bank_name: b.bank_name || `銀行 ${b.bank_id}`,
+      h_limit: Number(b.h_limit) || 0,
+      h_used: Number(b.h_used) || 0,
+      is_active: !!b.is_active,
+      recent: 0,
+      flash: 0,
+    }));
+    // stable sort so same-id always lands at same angle
+    banks.sort((a,b) => a.bank_id.localeCompare(b.bank_id));
+    state.banks = banks;
+    state.bankByCode = new Map(banks.map(b => [b.bank_id, b]));
+    layoutBanks();
+    renderBankOverlays();
+    setConn('ok');
+  } catch (e) {
+    setConn('err', `参加行取得失敗: ${e.message}`);
+  }
+}
+
+async function loadCircuit() {
+  try {
+    const r = await api('/api/circuit-breaker');
+    const map = {};
+    for (const c of (r.circuit_breakers || [])) {
+      if (c.bank_id) map[String(c.bank_id)] = c.state;
+    }
+    state.circuit = map;
+  } catch (e) { /* non-fatal */ }
+}
+
+async function pollTransactions() {
+  state.lastPollAt = Date.now();
+  try {
+    const r = await api('/api/transactions?limit=100');
+    const txs = r.transactions || [];
+    state.txs = txs;
+    setConn('ok');
+
+    // Detect newly seen transactions and emit pulses for them.
+    const fresh = [];
+    for (const t of txs) {
+      if (!state.knownTxids.has(t.txid)) {
+        state.knownTxids.add(t.txid);
+        fresh.push(t);
+      }
+    }
+    // First load: don't fire 100 pulses at once. Only fire pulses for the
+    // 8 most recent ones, and stagger them slightly so they fan in instead
+    // of all departing simultaneously.
+    if (!state.initialFanInDone) {
+      const seed = fresh.slice(0, 8);
+      seed.forEach((t, i) => setTimeout(() => emitPulseForTx(t), i * 80));
+      state.initialFanInDone = true;
+    } else {
+      fresh.forEach(t => emitPulseForTx(t));
+    }
+    state.selfPulse = Math.min(1, state.selfPulse + fresh.length * 0.18);
+
+    updateRightRail(txs);
+    updateAnomalies(txs);
+    updateCorridorStrip(txs);
+    updateLegendCounts(txs);
+    document.getElementById('emptyHint').classList.toggle('hidden', txs.length > 0 || !state.banks.length);
+    state.pollErrors = 0;
+  } catch (e) {
+    state.pollErrors++;
+    setConn('err', `取引取得失敗（${state.pollErrors}回）: ${e.message}`);
+  }
+}
+
+function setConn(kind, msg) {
+  const el = document.getElementById('connBadge');
+  if (!el) return;
+  if (kind === 'ok') {
+    el.innerHTML = '<span class="dot" style="color:#86efac"></span> リアルタイム';
+    el.style.background = 'rgba(120,255,180,.08)';
+    el.style.borderColor = 'rgba(120,255,180,.25)';
+  } else {
+    el.innerHTML = `<span class="dot" style="color:#fca5a5"></span> ${msg || '接続不安定'}`;
+    el.style.background = 'rgba(255,140,140,.08)';
+    el.style.borderColor = 'rgba(255,140,140,.25)';
+  }
+}
+
+// --- Pulses ------------------------------------------------------------------
+//
+// A pulse is a particle. For every newly-seen tx we emit a pulse from the
+// payer bank to the ZC, and a follow-up pulse from ZC to the payee bank a
+// short while later — capturing the actual lifecycle (request → coordinate →
+// settle).
+
+function emitPulseForTx(t) {
+  if (!state.laneOn.get(t.lane)) return;
+  const payer = state.bankByCode.get(String(t.payer_bank_id || ''));
+  const payee = state.bankByCode.get(String(t.payee_bank_id || ''));
+  if (!payer && !payee) return; // nothing to draw against
+  const lane = LANE_COLOR[t.lane] ? t.lane : 'BULK';
+  const stuck = STUCK_STATES.has(t.state);
+  const terminal = TERMINAL_STATES.has(t.state);
+
+  state.pulseHistory.push({ at: Date.now() });
+
+  if (payer) {
+    payer.flash = 1;
+    payer.recent++;
+    state.pulses.push(makePulse(payer, state.zcCenter, lane, t, { phase: 'in', stuck }));
+  }
+  if (payee) {
+    payee.flash = Math.max(payee.flash, .6);
+    state.pulses.push(makePulse(state.zcCenter, payee, lane, t, { phase: 'out', delay: 280, stuck, terminal }));
+  }
+}
+
+function makePulse(from, to, lane, tx, { phase, delay = 0, stuck, terminal }) {
+  return {
+    fromX: from.x, fromY: from.y,
+    toX: to.x, toY: to.y,
+    lane, txid: tx.txid,
+    born: Date.now() + delay,
+    life: phase === 'in' ? 1100 : 1300,
+    phase,
+    stuck: !!stuck,
+    terminal: !!terminal,
+    amount: Number(tx.amount_value || 0),
+  };
+}
+
+// --- Anomalies and aggregations ---------------------------------------------
+function updateAnomalies(txs) {
+  const stuckList = txs.filter(t => STUCK_STATES.has(t.state));
+  const broken = Object.values(state.circuit).filter(s => s === 'OPEN').length;
+  document.getElementById('stuckCount').textContent = stuckList.length;
+  document.getElementById('brokenCount').textContent = broken;
+
+  let detail = '';
+  if (stuckList.length) {
+    const sample = stuckList.slice(0, 3).map(t => `${t.lane} ${t.txid.slice(0,12)}…`);
+    detail += `停滞: ${sample.join(' / ')}`;
+    if (stuckList.length > 3) detail += ` 他 ${stuckList.length - 3} 件`;
+  }
+  if (broken) {
+    if (detail) detail += '\n';
+    const openBanks = Object.entries(state.circuit).filter(([_,s]) => s === 'OPEN').map(([b]) => b);
+    detail += `回路遮断: ${openBanks.join(', ')}`;
+  }
+  document.getElementById('anomalyDetail').textContent = detail || '今のところ平穏です';
+}
+
+function updateCorridorStrip(txs) {
+  const counts = new Map();
+  for (const t of txs) {
+    if (!t.payer_bank_id || !t.payee_bank_id) continue;
+    const k = `${t.payer_bank_id}→${t.payee_bank_id}`;
+    counts.set(k, (counts.get(k) || 0) + 1);
+  }
+  const top = [...counts.entries()].sort((a,b) => b[1]-a[1]).slice(0, 8);
+  const strip = document.getElementById('corridorStrip');
+  if (!top.length) { strip.innerHTML = '<span class="text-blue-200/40 px-2">— 回廊データなし —</span>'; return; }
+  strip.innerHTML = top.map(([k, n]) => {
+    const [a, b] = k.split('→');
+    return `<span class="hud-soft px-2 py-1 mono shrink-0" style="font-size:11px"><span class="text-blue-200/55">${a}</span> <span class="text-blue-200/35">→</span> <span class="text-blue-200/55">${b}</span> <span class="text-blue-100 ml-1">×${n}</span></span>`;
+  }).join('');
+}
+
+function updateLegendCounts(txs) {
+  const counts = {};
+  for (const t of txs) counts[t.lane] = (counts[t.lane] || 0) + 1;
+  const legend = document.getElementById('laneLegend');
+  legend.innerHTML = LANES.map(l => {
+    const c = counts[l] || 0;
+    const on = state.laneOn.get(l);
+    const color = `rgb(${LANE_COLOR[l].rgb.join(',')})`;
+    return `<div class="toggle ${on?'':'off'} flex items-center gap-1.5 hud-soft px-2 py-1.5" data-lane="${l}">
+      <span class="dot" style="color:${color}"></span>
+      <span class="text-blue-100/85">${l}</span>
+      <span class="ml-auto text-blue-200/55 mono">${c}</span>
+    </div>`;
+  }).join('');
+  legend.querySelectorAll('[data-lane]').forEach(el => {
+    el.addEventListener('click', () => {
+      const lane = el.dataset.lane;
+      state.laneOn.set(lane, !state.laneOn.get(lane));
+      el.classList.toggle('off', !state.laneOn.get(lane));
+    });
+  });
+}
+
+function updateRightRail(txs) {
+  const list = document.getElementById('txList');
+  const filtered = state.selectedBank
+    ? txs.filter(t => t.payer_bank_id === state.selectedBank || t.payee_bank_id === state.selectedBank)
+    : txs;
+  document.getElementById('txListTitle').textContent =
+    state.selectedBank ? `銀行 ${state.selectedBank} の流れ` : '直近の流れ';
+  document.getElementById('txListCount').textContent = filtered.length;
+
+  list.innerHTML = filtered.slice(0, 80).map(t => {
+    const cls = STUCK_STATES.has(t.state) ? 'state-STUCK'
+      : TERMINAL_STATES.has(t.state) ? 'state-TERM'
+      : WATCH_STATES.has(t.state) ? 'state-WATCH'
+      : 'state-OK';
+    const ts = shortClock(t.created_at);
+    const amt = t.amount_value ? `¥${Number(t.amount_value).toLocaleString()}` : '';
+    return `<div class="tx-row" data-txid="${t.txid}">
+      <span class="ts mono">${ts}</span>
+      <span class="lane lane-${t.lane}">${t.lane}</span>
+      <span class="corridor mono">${t.payer_bank_id || '?'}<span class="text-blue-200/35">→</span>${t.payee_bank_id || '?'}</span>
+      <span class="state ${cls}">${t.state}</span>
+    </div>`;
+  }).join('');
+  list.querySelectorAll('[data-txid]').forEach(el => {
+    el.addEventListener('click', () => {
+      const id = el.dataset.txid;
+      window.open(`/theater?txid=${encodeURIComponent(id)}`, '_blank');
+    });
+    el.title = `クリックでシアターを開く`;
+  });
+}
+
+// --- Bank overlays (click + tooltip) ----------------------------------------
+function renderBankOverlays() {
+  const ov = document.getElementById('overlay');
+  ov.innerHTML = '';
+  for (const b of state.banks) {
+    const hit = document.createElement('div');
+    hit.className = 'bank-hit';
+    hit.style.left = b.x + 'px';
+    hit.style.top  = b.y + 'px';
+    hit.title = b.bank_name;
+    hit.dataset.bank = b.bank_id;
+    hit.addEventListener('click', () => selectBank(b.bank_id));
+    let tooltip = null;
+    hit.addEventListener('mouseenter', () => {
+      tooltip = document.createElement('div');
+      tooltip.className = 'bank-tooltip';
+      const usePct = b.h_limit ? Math.round(100 * b.h_used / b.h_limit) : 0;
+      const cb = state.circuit[b.bank_id];
+      tooltip.innerHTML = `
+        <div class="text-blue-100"><b>${b.bank_id}</b> · ${b.bank_name}</div>
+        <div class="text-blue-200/65 mt-0.5">H 利用: ${usePct}%${cb && cb !== 'CLOSED' ? ` · <span class="text-rose-300">CB:${cb}</span>` : ''}</div>
+        <div class="text-blue-200/45 text-[10px] mt-0.5">クリックでこの銀行の流れに絞る</div>
+      `;
+      tooltip.style.left = b.x + 'px';
+      tooltip.style.top  = (b.y - 32) + 'px';
+      ov.appendChild(tooltip);
+    });
+    hit.addEventListener('mouseleave', () => { if (tooltip) { tooltip.remove(); tooltip = null; } });
+    ov.appendChild(hit);
+  }
+  if (state.selectedBank) {
+    const b = state.bankByCode.get(state.selectedBank);
+    if (b) {
+      const ring = document.createElement('div');
+      ring.className = 'bank-selected-ring';
+      ring.style.left = b.x + 'px';
+      ring.style.top = b.y + 'px';
+      ring.style.width = '64px';
+      ring.style.height = '64px';
+      ov.appendChild(ring);
+    }
+  }
+}
+
+function selectBank(bankId) {
+  state.selectedBank = state.selectedBank === bankId ? null : bankId;
+  renderBankOverlays();
+  updateRightRail(state.txs);
+}
+
+// --- Render loop -------------------------------------------------------------
+let lastFrame = performance.now();
+function frame(now) {
+  const dt = Math.min(64, now - lastFrame);
+  lastFrame = now;
+  draw(dt);
+  requestAnimationFrame(frame);
+}
+
+function draw(dt) {
+  const W = window.innerWidth, H = window.innerHeight;
+  // Trail (translucent fill replaces full clear)
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.fillStyle = `rgba(3,5,13, ${state.quiet ? .14 : state.trail})`;
+  ctx.fillRect(0, 0, W, H);
+
+  drawStars(dt);
+  drawConstellationLines();
+  drawBanks(dt);
+  drawCenter(dt);
+
+  // Pulses
+  ctx.globalCompositeOperation = 'lighter';
+  const now = Date.now();
+  state.pulses = state.pulses.filter(p => {
+    if (now < p.born) return true;
+    const t = (now - p.born) / p.life;
+    if (t > 1.05) return false;
+    drawPulse(p, t);
+    return true;
+  });
+  ctx.globalCompositeOperation = 'source-over';
+
+  updatePulseMeter();
+  // decay flashes & selfPulse
+  for (const b of state.banks) b.flash = Math.max(0, b.flash - dt/700);
+  state.selfPulse = Math.max(0, state.selfPulse - dt/1500);
+  state.pulseHistory = state.pulseHistory.filter(p => now - p.at < 60000);
+}
+
+function drawStars(dt) {
+  for (const s of stars) {
+    s.ph += s.tw * dt;
+    const a = s.a * (0.6 + 0.4 * Math.sin(s.ph));
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, s.r, 0, Math.PI*2);
+    ctx.fillStyle = `rgba(220, 230, 255, ${a})`;
+    ctx.fill();
+  }
+}
+
+function drawConstellationLines() {
+  if (!state.banks.length) return;
+  const cx = state.zcCenter.x, cy = state.zcCenter.y;
+  for (const b of state.banks) {
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(b.x, b.y);
+    ctx.strokeStyle = 'rgba(120,170,255,0.05)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
+}
+
+function drawBanks(dt) {
+  for (const b of state.banks) {
+    const cb = state.circuit[b.bank_id];
+    const broken = cb === 'OPEN';
+    const halfOpen = cb === 'HALF_OPEN';
+    const baseR = 7;
+    const pulseR = baseR + b.flash * 8;
+
+    // outer halo
+    const haloR = pulseR + 14;
+    const grad = ctx.createRadialGradient(b.x, b.y, baseR, b.x, b.y, haloR);
+    if (broken) grad.addColorStop(0, 'rgba(255,120,120,.55)');
+    else if (halfOpen) grad.addColorStop(0, 'rgba(255,200,120,.45)');
+    else grad.addColorStop(0, 'rgba(180,220,255,.45)');
+    grad.addColorStop(1, 'rgba(180,220,255,0)');
+    ctx.beginPath();
+    ctx.arc(b.x, b.y, haloR, 0, Math.PI*2);
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    // body
+    ctx.beginPath();
+    ctx.arc(b.x, b.y, pulseR, 0, Math.PI*2);
+    ctx.fillStyle = broken ? '#ff7a7a' : (halfOpen ? '#ffc987' : '#e8f0ff');
+    ctx.fill();
+
+    // selected ring
+    if (state.selectedBank === b.bank_id) {
+      ctx.beginPath();
+      ctx.arc(b.x, b.y, pulseR + 6, 0, Math.PI*2);
+      ctx.strokeStyle = 'rgba(180,220,255,.85)';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    }
+
+    // bank label
+    ctx.fillStyle = 'rgba(220,230,255,.78)';
+    ctx.font = '11px "SF Mono", Consolas, monospace';
+    ctx.textAlign = 'center';
+    // place label outward based on its angle from center
+    const ang = b.angle ?? 0;
+    const lx = b.x + Math.cos(ang) * 22;
+    const ly = b.y + Math.sin(ang) * 22 + 4;
+    ctx.fillText(b.bank_id, lx, ly);
+  }
+}
+
+function drawCenter(dt) {
+  const { x, y } = state.zcCenter;
+  // Subtle breathing core for ZC
+  const bx = 10 + state.selfPulse * 18;
+  const grad = ctx.createRadialGradient(x, y, 4, x, y, bx + 26);
+  grad.addColorStop(0, 'rgba(170,210,255,.85)');
+  grad.addColorStop(0.55, 'rgba(140,180,255,.25)');
+  grad.addColorStop(1, 'rgba(140,180,255,0)');
+  ctx.beginPath();
+  ctx.arc(x, y, bx + 26, 0, Math.PI*2);
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.arc(x, y, bx, 0, Math.PI*2);
+  ctx.fillStyle = '#dbeafe';
+  ctx.fill();
+
+  ctx.fillStyle = 'rgba(200,220,255,.85)';
+  ctx.font = '11px "SF Mono", Consolas, monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText('ZC', x, y + 30);
+}
+
+function drawPulse(p, t) {
+  const ease = t < 0 ? 0 : (t > 1 ? 1 : easeInOutCubic(Math.min(1, t)));
+  const x = p.fromX + (p.toX - p.fromX) * ease;
+  const y = p.fromY + (p.toY - p.fromY) * ease;
+  const [r,g,b] = LANE_COLOR[p.lane].rgb;
+  const alpha = p.stuck ? 0.55 + 0.4*Math.sin(performance.now()/120) : 0.95;
+  // tail
+  const len = 26 + (p.amount > 1_000_000 ? 14 : 0);
+  const tailX = x - (p.toX - p.fromX) / Math.max(1, dist(p.fromX, p.fromY, p.toX, p.toY)) * len;
+  const tailY = y - (p.toY - p.fromY) / Math.max(1, dist(p.fromX, p.fromY, p.toX, p.toY)) * len;
+  const tailGrad = ctx.createLinearGradient(tailX, tailY, x, y);
+  tailGrad.addColorStop(0, `rgba(${r},${g},${b},0)`);
+  tailGrad.addColorStop(1, `rgba(${r},${g},${b},${alpha*.85})`);
+  ctx.strokeStyle = tailGrad;
+  ctx.lineWidth = 2.2;
+  ctx.beginPath();
+  ctx.moveTo(tailX, tailY); ctx.lineTo(x, y); ctx.stroke();
+
+  // head glow
+  const hr = 4 + (p.amount > 10_000_000 ? 3 : 0);
+  const grad = ctx.createRadialGradient(x, y, 0, x, y, hr*3);
+  grad.addColorStop(0, `rgba(${r},${g},${b},${alpha})`);
+  grad.addColorStop(1, `rgba(${r},${g},${b},0)`);
+  ctx.beginPath();
+  ctx.arc(x, y, hr*3, 0, Math.PI*2);
+  ctx.fillStyle = grad;
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(x, y, hr, 0, Math.PI*2);
+  ctx.fillStyle = `rgba(${Math.min(255,r+30)},${Math.min(255,g+30)},${Math.min(255,b+30)},${alpha})`;
+  ctx.fill();
+
+  // landing flash
+  if (t > 0.95 && p.phase === 'out' && !p.stuck) {
+    ctx.beginPath();
+    const flashR = 14 * (1 - (t-0.95)/0.05);
+    ctx.arc(p.toX, p.toY, flashR, 0, Math.PI*2);
+    ctx.fillStyle = `rgba(${r},${g},${b},${(1-(t-0.95)/0.05) * .55})`;
+    ctx.fill();
+  }
+}
+
+function updatePulseMeter() {
+  const n = state.pulseHistory.length;
+  document.getElementById('pulseValue').textContent = n;
+  document.getElementById('pulseRate').textContent  = `${n} /分`;
+  const pct = Math.min(100, n * 4); // simple visual scale
+  document.getElementById('pulseBar').style.width = pct + '%';
+  // heartbeat speed reflects pulse rate
+  const heart = document.getElementById('heartIcon');
+  if (heart) {
+    if (n === 0) heart.style.animationDuration = '2.6s';
+    else if (n < 5) heart.style.animationDuration = '1.8s';
+    else if (n < 20) heart.style.animationDuration = '1.2s';
+    else heart.style.animationDuration = '.8s';
+  }
+}
+
+// --- Helpers -----------------------------------------------------------------
+function easeInOutCubic(t) { return t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t+2, 3)/2; }
+function dist(ax, ay, bx, by) { const dx = bx-ax, dy = by-ay; return Math.sqrt(dx*dx + dy*dy); }
+function shortClock(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  return d.toLocaleTimeString('ja-JP', { hour12:false });
+}
+
+// --- Wiring ------------------------------------------------------------------
+document.getElementById('pollSel').addEventListener('change', e => {
+  state.pollMs = parseInt(e.target.value, 10);
+  restartPolling();
+});
+document.getElementById('trailSel').addEventListener('change', e => {
+  state.trail = parseFloat(e.target.value);
+});
+document.getElementById('quietChk').addEventListener('change', e => {
+  state.quiet = e.target.checked;
+});
+document.getElementById('laneAll').addEventListener('click', () => {
+  for (const l of LANES) state.laneOn.set(l, true);
+  document.querySelectorAll('#laneLegend .toggle').forEach(el => el.classList.remove('off'));
+});
+
+// keyboard: ESC clears bank selection
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && state.selectedBank) selectBank(state.selectedBank);
+});
+
+let pollTimer = null;
+function restartPolling() {
+  if (pollTimer) clearInterval(pollTimer);
+  pollTimer = setInterval(pollTransactions, state.pollMs);
+}
+
+// --- Boot --------------------------------------------------------------------
+async function boot() {
+  resize();
+  await loadBanks();
+  await loadCircuit();
+  await pollTransactions();
+  restartPolling();
+  // Circuit-breaker poll runs less frequently
+  setInterval(loadCircuit, 15000);
+  // Refresh layout if banks list ever changes (dashboard adds/deletes a bank)
+  setInterval(loadBanks, 60000);
+  requestAnimationFrame(frame);
+}
+
+boot();
+
+</script>
+</body>
+</html>

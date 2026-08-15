@@ -1,0 +1,31 @@
+# ローカル開発用の秘密情報テンプレート。
+#
+# 使い方: このファイルを `.dev.vars` としてコピーし、値を埋める。
+# `.dev.vars` は .gitignore 済みで、`wrangler dev` がローカル起動時に自動で読み込む
+# （本番は Cloudflare Dashboard の Secret、または `wrangler secret put` で別途設定する。
+# 詳細は wrangler.toml.example の冒頭コメントを参照）。
+#
+#     cp .dev.vars.example .dev.vars
+#
+# ここに実際の値を書いたままコミットしないこと。
+
+# 共有 HMAC 署名鍵（必須。src/shared/hmac.ts）
+ZC_HMAC_SECRET="local-dev-secret-change-me"
+
+# 共有 HMAC のローテーション重複窓（任意。ローテーション時のみ両方設定する）
+# ZC_HMAC_SECRET_PREVIOUS="local-dev-previous-secret"
+# ZC_HMAC_SECRET_PREVIOUS_UNTIL="2026-08-01T00:00:00Z"
+
+# /internal 系エンドポイントの運営認証（必須）
+CRON_SECRET="local-dev-cron-secret"
+
+# QR コード発行の署名鍵（必須）
+QR_SECRET="local-dev-qr-secret"
+
+# 管理系エンドポイントの認証（任意。未設定時は ZC_HMAC_SECRET にフォールバック）
+# ZC_ADMIN_KEY="local-dev-admin-key"
+
+# ZC 自身の非対称送出署名（任意。両方設定すると共有 HMAC の代わりにこちらを使う）
+# ZC_SIGNING_KEY_ID="local-dev-key-1"
+# ZC_SIGNING_KEY_PKCS8="<base64 PKCS8 private key>"
+# ZC_SIGNING_ALGO="ECDSA_P256"

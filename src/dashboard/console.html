@@ -1,0 +1,949 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Zenith オペレーションコンソール</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      fontFamily: {
+        jp: ['"Noto Sans JP"','"Hiragino Sans"','"Yu Gothic"','sans-serif'],
+      },
+      colors: {
+        brand: {
+          50:  '#eef4ff',
+          100: '#d9e8fb',
+          500: '#003366',
+          600: '#0066CC',
+          700: '#004499',
+        },
+        accent: '#FF6600',
+      },
+    }
+  }
+}
+</script>
+<style>
+  .mono { font-family: 'SF Mono','Consolas','Courier New',monospace; font-size: .78rem; }
+  @keyframes fadeIn { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:none; } }
+  .fade-in { animation: fadeIn .2s ease; }
+  [x-cloak] { display: none; }
+  #consoleSidebar { transition: transform .28s cubic-bezier(.4,0,.2,1); }
+  #consoleOverlay { display:none; }
+  #consoleOverlay.open { display:block; }
+  @media (max-width: 767px) {
+    #consoleSidebar { transform: translateX(-100%); position:fixed; top:0; left:0; height:100%; z-index:50; }
+    #consoleSidebar.open { transform: translateX(0); }
+    #consoleMain { margin-left: 0 !important; }
+  }
+</style>
+</head>
+<body class="bg-gray-50 font-jp text-gray-800 min-h-screen">
+
+<div x-data="zcConsole()" x-cloak class="flex h-screen overflow-hidden">
+  <!-- Mobile overlay -->
+  <div id="consoleOverlay" class="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm" @click="closeSidebar()"></div>
+
+  <!-- Sidebar -->
+  <aside id="consoleSidebar" class="w-44 bg-white border-r border-gray-200 flex flex-col flex-shrink-0">
+    <div class="px-4 py-4 border-b border-gray-100">
+      <div class="font-serif text-lg text-brand-500 tracking-widest">Zenith</div>
+      <div class="text-[10px] text-gray-400 mt-0.5">Operation Console</div>
+    </div>
+    <nav class="flex-1 py-2 space-y-0.5 overflow-y-auto">
+      <template x-for="r in roles" :key="r.key">
+        <button @click="role = r.key; $nextTick(() => drawCharts()); closeSidebar()"
+          :class="role === r.key ? 'bg-brand-50 text-brand-600 border-brand-500 font-medium' : 'text-gray-600 border-transparent hover:bg-gray-50'"
+          class="w-full text-left px-4 py-2 text-sm flex items-center gap-2 border-l-[3px] transition-colors">
+          <i :class="r.icon" class="w-5 text-center text-sm"></i>
+          <span x-text="r.label"></span>
+        </button>
+      </template>
+    </nav>
+    <div class="px-4 py-2 border-t border-gray-100 text-[10px] text-gray-400">
+      更新: <span x-text="lastRefresh">-</span>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <div id="consoleMain" class="flex-1 flex flex-col overflow-hidden">
+    <!-- Header -->
+    <header class="bg-white border-b border-gray-200 px-4 md:px-5 py-3 flex items-center justify-between flex-shrink-0 gap-3">
+      <div class="flex items-center gap-3 min-w-0">
+        <!-- Hamburger (mobile only) -->
+        <button @click="openSidebar()" class="md:hidden flex-shrink-0 w-9 h-9 flex flex-col items-center justify-center gap-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors">
+          <span class="block w-5 h-0.5 bg-gray-600 rounded"></span>
+          <span class="block w-5 h-0.5 bg-gray-600 rounded"></span>
+          <span class="block w-5 h-0.5 bg-gray-600 rounded"></span>
+        </button>
+        <h1 class="text-base font-medium text-gray-700 truncate" x-text="roles.find(r=>r.key===role)?.label + ' ダッシュボード'"></h1>
+      </div>
+      <div class="flex items-center gap-3">
+        <span :class="systemMode.mode==='NORMAL' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'"
+          class="text-xs px-2 py-0.5 rounded-full font-medium flex items-center gap-1"
+          :title="systemMode.reason || ''">
+          <i :class="systemMode.mode==='NORMAL' ? 'fa-solid fa-circle-check' : 'fa-solid fa-triangle-exclamation'"></i>
+          <span x-text="systemMode.mode || 'NORMAL'"></span>
+        </span>
+        <template x-if="alerts.length">
+          <div class="flex items-center gap-1">
+            <template x-for="a in alerts" :key="a.msg">
+              <span :class="a.level==='HIGH' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'"
+                class="text-xs px-2 py-0.5 rounded-full font-medium" x-text="a.msg"></span>
+            </template>
+          </div>
+        </template>
+        <button @click="refresh()" class="text-xs text-gray-400 hover:text-gray-600 px-3 py-1 rounded border border-gray-200"><i class="fa-solid fa-arrows-rotate mr-1"></i>更新</button>
+      </div>
+    </header>
+
+    <!-- Content -->
+    <div class="flex-1 overflow-y-auto p-4 md:p-5">
+
+      <!-- KPI cards (全ロール共通) -->
+      <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-5 fade-in">
+        <div class="bg-white rounded-lg border border-gray-200 p-4 text-center">
+          <div class="text-gray-300 mb-1"><i class="fa-solid fa-exchange-alt text-lg"></i></div>
+          <div class="text-2xl font-serif text-brand-600" x-text="kpi.total"></div>
+          <div class="text-[11px] text-gray-400 mt-1">取引総数</div>
+        </div>
+        <div class="bg-white rounded-lg border border-gray-200 p-4 text-center">
+          <div class="text-emerald-200 mb-1"><i class="fa-solid fa-circle-check text-lg"></i></div>
+          <div class="text-2xl font-serif text-emerald-600" x-text="kpi.settled"></div>
+          <div class="text-[11px] text-gray-400 mt-1">決済完了</div>
+        </div>
+        <div class="bg-white rounded-lg border border-gray-200 p-4 text-center">
+          <div class="text-red-200 mb-1"><i class="fa-solid fa-circle-xmark text-lg"></i></div>
+          <div class="text-2xl font-serif text-red-500" x-text="kpi.failed"></div>
+          <div class="text-[11px] text-gray-400 mt-1">失敗</div>
+        </div>
+        <div class="bg-white rounded-lg border border-gray-200 p-4 text-center">
+          <div class="text-blue-200 mb-1"><i class="fa-solid fa-network-wired text-lg"></i></div>
+          <div class="text-lg font-medium" x-text="kpi.dns"></div>
+          <div class="text-[11px] text-gray-400 mt-1">DNS状態</div>
+        </div>
+        <div class="bg-white rounded-lg border border-gray-200 p-4 text-center">
+          <div class="text-amber-200 mb-1"><i class="fa-solid fa-bell text-lg"></i></div>
+          <div class="text-2xl font-serif text-amber-600" x-text="notifications.sent"></div>
+          <div class="text-[11px] text-gray-400 mt-1">入金通知</div>
+        </div>
+        <div class="bg-white rounded-lg border border-gray-200 p-4 text-center">
+          <div class="text-indigo-200 mb-1"><i class="fa-solid fa-user-check text-lg"></i></div>
+          <div class="text-2xl font-serif text-indigo-600" x-text="acctVerifyStats.matched"></div>
+          <div class="text-[11px] text-gray-400 mt-1">口座確認</div>
+        </div>
+      </div>
+
+      <!-- ops -->
+      <template x-if="role === 'ops'">
+        <div class="space-y-4 fade-in">
+          <div class="bg-white rounded-lg border border-gray-200 p-4">
+            <h3 class="text-sm font-medium text-gray-700 mb-3 pb-2 border-b border-gray-100"><i class="fa-solid fa-chart-bar mr-1 text-gray-400"></i>レーン別件数</h3>
+            <div id="chartLaneBar" style="height:220px"></div>
+          </div>
+          <template x-if="alerts.length">
+            <div class="bg-white rounded-lg border border-gray-200 p-4">
+              <h3 class="text-sm font-medium text-gray-700 mb-3 pb-2 border-b border-gray-100"><i class="fa-solid fa-triangle-exclamation mr-1 text-amber-400"></i>アラート</h3>
+              <template x-for="a in alerts" :key="a.msg">
+                <div :class="a.level==='HIGH' ? 'border-red-200 bg-red-50' : 'border-amber-200 bg-amber-50'"
+                  class="border rounded p-3 text-sm mb-2">
+                  <span :class="a.level==='HIGH' ? 'text-red-700' : 'text-amber-700'" x-text="a.msg"></span>
+                </div>
+              </template>
+            </div>
+          </template>
+          <div class="bg-white rounded-lg border border-gray-200 p-4">
+            <h4 class="text-sm font-medium text-gray-600 mb-3"><i class="fa-solid fa-bell mr-1 text-gray-400"></i>入金通知ステータス</h4>
+            <div class="grid grid-cols-3 gap-3 text-center">
+              <div class="bg-emerald-50 rounded p-3">
+                <div class="text-lg font-bold text-emerald-600" x-text="notifications.sent">0</div>
+                <div class="text-xs text-gray-500">送信成功</div>
+              </div>
+              <div class="bg-amber-50 rounded p-3">
+                <div class="text-lg font-bold text-amber-600" x-text="notifications.retry">0</div>
+                <div class="text-xs text-gray-500">リトライ中</div>
+              </div>
+              <div class="bg-red-50 rounded p-3">
+                <div class="text-lg font-bold text-red-600" x-text="notifications.failed">0</div>
+                <div class="text-xs text-gray-500">失敗</div>
+              </div>
+            </div>
+          </div>
+          <div class="bg-white rounded-lg border border-gray-200 p-4">
+            <h4 class="text-sm font-medium text-gray-600 mb-3"><i class="fa-solid fa-user-check mr-1 text-gray-400"></i>事前口座確認KPI</h4>
+            <div class="grid grid-cols-3 gap-3 text-center">
+              <div class="bg-emerald-50 rounded p-3">
+                <div class="text-lg font-bold text-emerald-600" x-text="acctVerifyStats.matched">0</div>
+                <div class="text-xs text-gray-500">MATCHED</div>
+              </div>
+              <div class="bg-amber-50 rounded p-3">
+                <div class="text-lg font-bold text-amber-600" x-text="acctVerifyStats.unmatched">0</div>
+                <div class="text-xs text-gray-500">UNMATCHED</div>
+              </div>
+              <div class="bg-red-50 rounded p-3">
+                <div class="text-lg font-bold text-red-600" x-text="acctVerifyStats.notFound">0</div>
+                <div class="text-xs text-gray-500">NOT_FOUND</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </template>
+
+      <!-- liq -->
+      <template x-if="role === 'liq'">
+        <div class="space-y-4 fade-in">
+          <div class="bg-white rounded-lg border border-gray-200 p-4">
+            <h3 class="text-sm font-medium text-gray-700 mb-3 pb-2 border-b border-gray-100"><i class="fa-solid fa-gauge-high mr-1 text-gray-400"></i>H利用率ゲージ</h3>
+            <div id="chartLiqGauges" class="grid grid-cols-3 md:grid-cols-5 gap-3"></div>
+          </div>
+          <div class="bg-white rounded-lg border border-gray-200 p-4">
+            <h3 class="text-sm font-medium text-gray-700 mb-3 pb-2 border-b border-gray-100"><i class="fa-solid fa-scale-balanced mr-1 text-gray-400"></i>DNSネットポジション</h3>
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead><tr class="border-b border-gray-200 text-left">
+                  <th class="pb-2 text-xs text-gray-400 font-medium">銀行</th>
+                  <th class="pb-2 text-xs text-gray-400 font-medium text-right">Debit</th>
+                  <th class="pb-2 text-xs text-gray-400 font-medium text-right">Credit</th>
+                  <th class="pb-2 text-xs text-gray-400 font-medium text-right">Net</th>
+                </tr></thead>
+                <tbody class="divide-y divide-gray-100">
+                  <template x-for="p in dnsPos" :key="p.bank_id">
+                    <tr class="hover:bg-gray-50">
+                      <td class="py-1.5 text-xs" x-text="p.bank_id"></td>
+                      <td class="py-1.5 text-xs text-right" x-text="fmt(p.debit_amount||0)"></td>
+                      <td class="py-1.5 text-xs text-right" x-text="fmt(p.credit_amount||0)"></td>
+                      <td class="py-1.5 text-xs text-right font-medium"
+                        :class="(p.credit_amount||0)-(p.debit_amount||0) >= 0 ? 'text-emerald-600' : 'text-red-600'"
+                        x-text="(((p.credit_amount||0)-(p.debit_amount||0))>=0?'+':'')+fmt((p.credit_amount||0)-(p.debit_amount||0))"></td>
+                    </tr>
+                  </template>
+                  <template x-if="!dnsPos.length">
+                    <tr><td colspan="4" class="py-4 text-center text-gray-400 text-sm">本日のDNSポジションなし</td></tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div class="bg-white rounded-lg border border-gray-200 p-4">
+            <h3 class="text-sm font-medium text-gray-700 mb-3 pb-2 border-b border-gray-100"><i class="fa-solid fa-building-columns mr-1 text-gray-400"></i>日銀当座預金残高（プレファンド型RTGS）</h3>
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead><tr class="border-b border-gray-200 text-left">
+                  <th class="pb-2 text-xs text-gray-400 font-medium">銀行</th>
+                  <th class="pb-2 text-xs text-gray-400 font-medium text-right">当座残高</th>
+                  <th class="pb-2 text-xs text-gray-400 font-medium">充足度</th>
+                </tr></thead>
+                <tbody class="divide-y divide-gray-100">
+                  <template x-for="p in bojPositions" :key="p.bank_id">
+                    <tr class="hover:bg-gray-50">
+                      <td class="py-1.5 text-xs" x-text="p.bank_id"></td>
+                      <td class="py-1.5 text-xs text-right font-medium"
+                        :class="(p.boj_balance||0) >= 0 ? 'text-emerald-600' : 'text-red-600'"
+                        x-text="fmt(p.boj_balance||0)"></td>
+                      <td class="py-1.5">
+                        <div class="h-1.5 bg-gray-100 rounded-full overflow-hidden w-32">
+                          <div class="h-full rounded-full"
+                            :class="(p.boj_balance||0) >= 0 ? 'bg-emerald-400' : 'bg-red-400'"
+                            :style="`width:${bojBarPct(p.boj_balance||0)}%`"></div>
+                        </div>
+                      </td>
+                    </tr>
+                  </template>
+                  <template x-if="!bojPositions.length">
+                    <tr><td colspan="3" class="py-4 text-center text-gray-400 text-sm">残高データなし</td></tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+            <div class="mt-2 text-[10px] text-gray-400">as of <span x-text="bojAsOf || '-'"></span></div>
+          </div>
+        </div>
+      </template>
+
+      <!-- biz -->
+      <template x-if="role === 'biz'">
+        <div class="space-y-4 fade-in">
+          <div class="bg-white rounded-lg border border-gray-200 p-4">
+            <h3 class="text-sm font-medium text-gray-700 mb-3 pb-2 border-b border-gray-100"><i class="fa-solid fa-chart-line mr-1 text-gray-400"></i>時系列（1時間bucket）</h3>
+            <div id="chartTimeline" style="height:200px"></div>
+          </div>
+          <div class="grid grid-cols-2 gap-4">
+            <div class="bg-white rounded-lg border border-gray-200 p-4">
+              <h3 class="text-sm font-medium text-gray-700 mb-3 pb-2 border-b border-gray-100"><i class="fa-solid fa-chart-pie mr-1 text-gray-400"></i>レーン別シェア</h3>
+              <div id="chartPie" style="height:200px"></div>
+            </div>
+            <div class="bg-white rounded-lg border border-gray-200 p-4">
+              <h3 class="text-sm font-medium text-gray-700 mb-3 pb-2 border-b border-gray-100"><i class="fa-solid fa-ranking-star mr-1 text-gray-400"></i>銀行別送金額ランキング</h3>
+              <div class="space-y-1">
+                <template x-for="(b, i) in bankRanking.slice(0,8)" :key="b.bank_id">
+                  <div class="flex items-center gap-2 text-xs">
+                    <span class="text-gray-400 w-4" x-text="i+1"></span>
+                    <span class="flex-1 truncate" x-text="b.bank_id"></span>
+                    <span class="font-medium text-brand-600" x-text="fmt(b.total)"></span>
+                  </div>
+                </template>
+              </div>
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-4">
+            <div class="bg-white rounded-lg border border-gray-200 p-4">
+              <h4 class="text-sm font-medium text-gray-600 mb-3"><i class="fa-solid fa-globe mr-1 text-gray-400"></i>クロスボーダー取引</h4>
+              <div class="grid grid-cols-2 gap-3 text-center">
+                <div class="bg-blue-50 rounded p-3">
+                  <div class="text-lg font-bold text-blue-600" x-text="crossBorder.count">0</div>
+                  <div class="text-xs text-gray-500">件数</div>
+                </div>
+                <div class="bg-blue-50 rounded p-3">
+                  <div class="text-lg font-bold text-blue-600" x-text="fmt(crossBorder.volume)"></div>
+                  <div class="text-xs text-gray-500">取引額</div>
+                </div>
+              </div>
+              <div class="mt-3 text-xs text-gray-400">HTLC / GTID レーンの合計</div>
+            </div>
+            <div class="bg-white rounded-lg border border-gray-200 p-4">
+              <h4 class="text-sm font-medium text-gray-600 mb-3"><i class="fa-solid fa-qrcode mr-1 text-gray-400"></i>QR/エイリアス利用統計</h4>
+              <div class="grid grid-cols-2 gap-3 text-center">
+                <div class="bg-violet-50 rounded p-3">
+                  <div class="text-lg font-bold text-violet-600" x-text="qrAlias.qr">0</div>
+                  <div class="text-xs text-gray-500">QR決済</div>
+                </div>
+                <div class="bg-violet-50 rounded p-3">
+                  <div class="text-lg font-bold text-violet-600" x-text="qrAlias.alias">0</div>
+                  <div class="text-xs text-gray-500">エイリアス</div>
+                </div>
+              </div>
+              <div class="mt-3 text-xs text-gray-400">PSPR経由の利用件数</div>
+            </div>
+          </div>
+        </div>
+      </template>
+
+      <!-- sre -->
+      <template x-if="role === 'sre'">
+        <div class="space-y-4 fade-in">
+          <div class="bg-white rounded-lg border border-gray-200 p-4">
+            <h3 class="text-sm font-medium text-gray-700 mb-3 pb-2 border-b border-gray-100"><i class="fa-solid fa-chart-column mr-1 text-gray-400"></i>状態分布</h3>
+            <div id="chartStateBar" style="height:200px"></div>
+          </div>
+          <div class="bg-white rounded-lg border border-gray-200 p-4">
+            <h3 class="text-sm font-medium text-gray-700 mb-3 pb-2 border-b border-gray-100"><i class="fa-solid fa-wrench mr-1 text-gray-400"></i>手動操作</h3>
+            <div class="flex gap-2 flex-wrap">
+              <button @click="doSweep()" class="text-xs border border-gray-200 rounded px-3 py-1.5 hover:bg-gray-50"><i class="fa-solid fa-clock-rotate-left mr-1"></i>タイムアウト巡回</button>
+              <button @click="doEod()" class="text-xs border border-gray-200 rounded px-3 py-1.5 hover:bg-gray-50"><i class="fa-solid fa-moon mr-1"></i>EODバッチ</button>
+            </div>
+            <div x-text="sreMsg" class="text-xs text-gray-500 mt-2 mono"></div>
+          </div>
+
+          <!-- システムモード -->
+          <div class="bg-white rounded-lg border border-gray-200 p-4">
+            <h3 class="text-sm font-medium text-gray-700 mb-3 pb-2 border-b border-gray-100"><i class="fa-solid fa-toggle-on mr-1 text-gray-400"></i>システム稼働モード</h3>
+            <div class="flex items-center gap-3">
+              <span :class="systemMode.mode==='NORMAL' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'"
+                class="text-sm px-3 py-1 rounded-full font-medium" x-text="systemMode.mode || 'NORMAL'"></span>
+              <div class="text-xs text-gray-500">
+                <template x-if="systemMode.reason"><span x-text="systemMode.reason"></span></template>
+                <template x-if="!systemMode.reason"><span class="text-gray-400">通常稼働中（書き込み受付可）</span></template>
+              </div>
+            </div>
+            <div class="mt-2 text-[10px] text-gray-400">
+              更新: <span x-text="(systemMode.updated_at||'').replace('T',' ').slice(0,19) || '-'"></span>
+            </div>
+          </div>
+
+          <!-- サーキットブレーカー -->
+          <div class="bg-white rounded-lg border border-gray-200 p-4">
+            <h3 class="text-sm font-medium text-gray-700 mb-3 pb-2 border-b border-gray-100"><i class="fa-solid fa-plug-circle-bolt mr-1 text-gray-400"></i>参加銀行 サーキットブレーカー</h3>
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead><tr class="border-b border-gray-200 text-left">
+                  <th class="pb-2 text-xs text-gray-400 font-medium">銀行</th>
+                  <th class="pb-2 text-xs text-gray-400 font-medium">状態</th>
+                  <th class="pb-2 text-xs text-gray-400 font-medium text-right">連続失敗</th>
+                  <th class="pb-2 text-xs text-gray-400 font-medium text-right">成功/失敗/拒否</th>
+                  <th class="pb-2 text-xs text-gray-400 font-medium text-right">操作</th>
+                </tr></thead>
+                <tbody class="divide-y divide-gray-100">
+                  <template x-for="c in circuits" :key="c.bank_id">
+                    <tr class="hover:bg-gray-50">
+                      <td class="py-1.5 text-xs font-medium" x-text="c.bank_id"></td>
+                      <td class="py-1.5">
+                        <span class="inline-block rounded-full px-2 py-0.5 text-[11px]"
+                          :class="c.state==='CLOSED'?'bg-emerald-100 text-emerald-700':c.state==='OPEN'?'bg-red-100 text-red-700':'bg-amber-100 text-amber-700'"
+                          x-text="c.state"></span>
+                      </td>
+                      <td class="py-1.5 text-xs text-right" :class="(c.consecutive_failures||0)>0?'text-red-600 font-medium':''" x-text="c.consecutive_failures||0"></td>
+                      <td class="py-1.5 text-[11px] text-right text-gray-500">
+                        <span class="text-emerald-600" x-text="c.total_successes||0"></span> /
+                        <span class="text-red-600" x-text="c.total_failures||0"></span> /
+                        <span class="text-amber-600" x-text="c.total_denied||0"></span>
+                      </td>
+                      <td class="py-1.5 text-right">
+                        <button x-show="c.state!=='CLOSED'" @click="resetCircuit(c.bank_id)"
+                          class="text-[11px] border border-gray-200 rounded px-2 py-1 hover:bg-gray-50"><i class="fa-solid fa-rotate-left mr-1"></i>リセット</button>
+                        <span x-show="c.state==='CLOSED'" class="text-[11px] text-gray-300">—</span>
+                      </td>
+                    </tr>
+                  </template>
+                  <template x-if="!circuits.length">
+                    <tr><td colspan="5" class="py-4 text-center text-gray-400 text-sm">サーキットブレーカーの記録なし（全行CLOSED）</td></tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+            <div x-text="cbMsg" class="text-xs text-gray-500 mt-2 mono"></div>
+          </div>
+        </div>
+      </template>
+
+      <!-- audit -->
+      <template x-if="role === 'audit'">
+        <div class="fade-in">
+          <div class="bg-white rounded-lg border border-gray-200 p-4">
+            <h3 class="text-sm font-medium text-gray-700 mb-3 pb-2 border-b border-gray-100"><i class="fa-solid fa-list mr-1 text-gray-400"></i>全取引（<span x-text="txs.length"></span>件）</h3>
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead><tr class="border-b border-gray-200 text-left">
+                  <th class="pb-2 text-xs text-gray-400 font-medium">TXID</th>
+                  <th class="pb-2 text-xs text-gray-400 font-medium">状態</th>
+                  <th class="pb-2 text-xs text-gray-400 font-medium">レーン</th>
+                  <th class="pb-2 text-xs text-gray-400 font-medium text-right">金額</th>
+                  <th class="pb-2 text-xs text-gray-400 font-medium">日時</th>
+                </tr></thead>
+                <tbody class="divide-y divide-gray-100">
+                  <template x-for="t in txs.slice(0,100)" :key="t.txid">
+                    <tr class="hover:bg-gray-50 cursor-pointer" @click="toggleAudit(t.txid)">
+                      <td class="py-1.5 mono text-[11px]" x-text="t.txid?.slice(0,20)+'...'"></td>
+                      <td class="py-1.5"><span class="inline-block rounded-full px-2 py-0.5 text-[11px]"
+                        :class="t.state==='SETTLED'?'bg-emerald-100 text-emerald-700':t.state?.startsWith('FAIL')||t.state==='CANCELLED'?'bg-red-100 text-red-700':'bg-amber-100 text-amber-700'"
+                        x-text="t.state"></span></td>
+                      <td class="py-1.5 text-xs" x-text="t.lane||'-'"></td>
+                      <td class="py-1.5 text-xs text-right" x-text="fmt(t.amount?.value||0)"></td>
+                      <td class="py-1.5 text-[11px] text-gray-400" x-text="(t.created_at||'').replace('T',' ').slice(0,19)"></td>
+                    </tr>
+                    <template x-if="auditSel === t.txid">
+                      <tr>
+                        <td colspan="5" class="bg-gray-50 px-4 py-3">
+                          <!-- 監査ツールバー -->
+                          <div class="flex gap-2 flex-wrap mb-3">
+                            <button @click="loadExplain(t.txid)" class="text-[11px] border border-gray-200 bg-white rounded px-2.5 py-1 hover:bg-brand-50"><i class="fa-solid fa-list-check mr-1 text-gray-400"></i>状態説明</button>
+                            <button @click="loadStory(t.txid)" class="text-[11px] border border-gray-200 bg-white rounded px-2.5 py-1 hover:bg-brand-50"><i class="fa-solid fa-book-open mr-1 text-gray-400"></i>取引ストーリー</button>
+                            <button @click="loadVerify(t.txid)" class="text-[11px] border border-gray-200 bg-white rounded px-2.5 py-1 hover:bg-brand-50"><i class="fa-solid fa-shield-halved mr-1 text-gray-400"></i>ハッシュ鎖検証</button>
+                            <button @click="loadReversals(t.txid)" class="text-[11px] border border-gray-200 bg-white rounded px-2.5 py-1 hover:bg-brand-50"><i class="fa-solid fa-rotate-left mr-1 text-gray-400"></i>組戻照会</button>
+                            <button @click="auditView='json'" class="text-[11px] border border-gray-200 bg-white rounded px-2.5 py-1 hover:bg-brand-50"><i class="fa-solid fa-code mr-1 text-gray-400"></i>生JSON</button>
+                          </div>
+
+                          <!-- 検証バッジ -->
+                          <template x-if="auditData.verify">
+                            <div class="mb-3 flex items-center gap-2">
+                              <span :class="auditData.verify.valid ? 'bg-emerald-100 text-emerald-700':'bg-red-100 text-red-700'"
+                                class="text-xs px-2.5 py-1 rounded-full font-medium">
+                                <i :class="auditData.verify.valid ? 'fa-solid fa-lock':'fa-solid fa-lock-open'" class="mr-1"></i>
+                                <span x-text="auditData.verify.valid ? 'ハッシュ鎖は完全（改竄なし）' : '鎖の破断を検知'"></span>
+                              </span>
+                              <span class="text-[11px] text-gray-500" x-text="`検証エントリ数: ${auditData.verify.entries_checked}` + (auditData.verify.break_at_seq!=null ? ` / 破断 seq=${auditData.verify.break_at_seq}`:'')"></span>
+                            </div>
+                          </template>
+
+                          <!-- explain タイムライン -->
+                          <template x-if="auditView==='explain' && auditData.explain">
+                            <div>
+                              <div class="text-xs text-gray-600 mb-2">
+                                <span class="font-medium" x-text="auditData.explain.summary"></span>
+                                <span :class="auditData.explain.integrity?.chain_verified ? 'text-emerald-600':'text-red-600'" class="ml-2 text-[11px]"
+                                  x-text="auditData.explain.integrity?.chain_verified ? '✓ 完全性OK' : '⚠ 完全性NG'"></span>
+                              </div>
+                              <div class="overflow-x-auto">
+                                <table class="w-full text-xs">
+                                  <thead><tr class="border-b border-gray-200 text-left text-gray-400">
+                                    <th class="pb-1 font-medium">#</th>
+                                    <th class="pb-1 font-medium">日時</th>
+                                    <th class="pb-1 font-medium">イベント</th>
+                                    <th class="pb-1 font-medium">遷移</th>
+                                    <th class="pb-1 font-medium">説明</th>
+                                  </tr></thead>
+                                  <tbody class="divide-y divide-gray-100">
+                                    <template x-for="ev in auditData.explain.timeline" :key="ev.seq">
+                                      <tr>
+                                        <td class="py-1 text-gray-400" x-text="ev.seq"></td>
+                                        <td class="py-1 text-[10px] text-gray-400 mono" x-text="(ev.at||'').replace('T',' ').slice(0,19)"></td>
+                                        <td class="py-1 mono text-[10px]" x-text="ev.event"></td>
+                                        <td class="py-1 text-[10px] text-gray-500" x-text="(ev.state_from||'∅')+'→'+ev.state_to"></td>
+                                        <td class="py-1 text-gray-600" x-text="ev.reason"></td>
+                                      </tr>
+                                    </template>
+                                  </tbody>
+                                </table>
+                              </div>
+                            </div>
+                          </template>
+
+                          <!-- story -->
+                          <template x-if="auditView==='story' && auditData.story">
+                            <div>
+                              <div class="text-sm font-medium text-gray-700 mb-1" x-text="auditData.story.headline"></div>
+                              <p class="text-xs text-gray-600 mb-3 leading-relaxed" x-text="auditData.story.narrative"></p>
+                              <div class="bg-white border border-gray-200 rounded p-2 overflow-x-auto">
+                                <div :id="'mermaid-'+t.txid" class="mermaid-target"></div>
+                              </div>
+                            </div>
+                          </template>
+
+                          <!-- reversals -->
+                          <template x-if="auditView==='reversals'">
+                            <div>
+                              <template x-if="auditData.reversals && auditData.reversals.length">
+                                <table class="w-full text-xs">
+                                  <thead><tr class="border-b border-gray-200 text-left text-gray-400">
+                                    <th class="pb-1 font-medium">Reversal ID</th>
+                                    <th class="pb-1 font-medium">状態</th>
+                                    <th class="pb-1 font-medium">理由</th>
+                                    <th class="pb-1 font-medium text-right">金額</th>
+                                  </tr></thead>
+                                  <tbody class="divide-y divide-gray-100">
+                                    <template x-for="rv in auditData.reversals" :key="rv.reversal_id">
+                                      <tr>
+                                        <td class="py-1 mono text-[10px]" x-text="rv.reversal_id"></td>
+                                        <td class="py-1" x-text="rv.state||rv.status||'-'"></td>
+                                        <td class="py-1 text-gray-600" x-text="rv.reason_code||rv.reason||'-'"></td>
+                                        <td class="py-1 text-right" x-text="fmt(rv.amount_value||rv.amount?.value||0)"></td>
+                                      </tr>
+                                    </template>
+                                  </tbody>
+                                </table>
+                              </template>
+                              <template x-if="auditData.reversals && !auditData.reversals.length">
+                                <div class="text-xs text-gray-400 py-2">この取引に対する組戻はありません。</div>
+                              </template>
+                            </div>
+                          </template>
+
+                          <!-- raw json -->
+                          <template x-if="auditView==='json'">
+                            <pre class="mono text-[11px] text-gray-700 whitespace-pre-wrap" x-text="JSON.stringify(t, null, 2)"></pre>
+                          </template>
+
+                          <div x-show="auditBusy" class="text-[11px] text-gray-400 mt-2"><i class="fa-solid fa-spinner fa-spin mr-1"></i>読み込み中...</div>
+                        </td>
+                      </tr>
+                    </template>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </template>
+
+      <!-- admin -->
+      <template x-if="role === 'admin'">
+        <div class="space-y-4 fade-in">
+          <div class="bg-white rounded-lg border border-gray-200 p-4">
+            <h3 class="text-sm font-medium text-gray-700 mb-3 pb-2 border-b border-gray-100"><i class="fa-solid fa-sliders mr-1 text-gray-400"></i>管理操作</h3>
+            <div class="flex gap-2 flex-wrap">
+              <button @click="doSeed()" class="text-xs bg-amber-100 text-amber-800 border border-amber-200 rounded px-3 py-1.5 hover:bg-amber-200"><i class="fa-solid fa-seedling mr-1"></i>シードリセット</button>
+              <button @click="doEod()" class="text-xs border border-gray-200 rounded px-3 py-1.5 hover:bg-gray-50"><i class="fa-solid fa-moon mr-1"></i>EODバッチ</button>
+              <button @click="doSweep()" class="text-xs border border-gray-200 rounded px-3 py-1.5 hover:bg-gray-50"><i class="fa-solid fa-clock-rotate-left mr-1"></i>タイムアウト巡回</button>
+              <button @click="doDnsKick()" class="text-xs border border-gray-200 rounded px-3 py-1.5 hover:bg-gray-50"><i class="fa-solid fa-bolt mr-1"></i>DNS Kick</button>
+            </div>
+            <div x-text="adminMsg" class="text-xs text-gray-500 mt-2 mono"></div>
+          </div>
+          <div class="bg-white rounded-lg border border-gray-200 p-4">
+            <h3 class="text-sm font-medium text-gray-700 mb-3 pb-2 border-b border-gray-100"><i class="fa-solid fa-building-columns mr-1 text-gray-400"></i>参加銀行 (<span x-text="banks.length"></span>行)</h3>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
+              <template x-for="b in banks" :key="b.bank_id">
+                <div class="border border-gray-200 rounded p-2 text-xs">
+                  <div class="font-medium" x-text="b.bank_id"></div>
+                  <div class="text-gray-400 truncate" x-text="b.bank_name"></div>
+                </div>
+              </template>
+            </div>
+          </div>
+        </div>
+      </template>
+
+    </div>
+  </div>
+</div>
+
+<script>
+if (typeof mermaid !== 'undefined') {
+  mermaid.initialize({ startOnLoad: false, securityLevel: 'loose', theme: 'neutral' });
+}
+
+function fmt(v) { return Number(v).toLocaleString('ja-JP') + ' 円'; }
+// bank_name is attacker-influenceable free text (server only checks non-empty,
+// never sanitizes). Most of this console renders via Alpine x-text (auto-
+// escaping), but the one raw innerHTML template below needs explicit escaping.
+function esc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+}
+
+// The CRON_SECRET must never be baked into this served artifact. It is entered
+// by the operator and kept only in sessionStorage; no secret → no header → the
+// server's fail-closed gate returns 403.
+function getCronSecret() {
+  let s = sessionStorage.getItem('zenith_cron_secret');
+  if (!s) {
+    s = (prompt('運用操作には X-Cron-Secret が必要です。環境に設定した CRON_SECRET を入力してください:') || '').trim();
+    if (s) sessionStorage.setItem('zenith_cron_secret', s);
+  }
+  return s;
+}
+function cronH() {
+  const s = getCronSecret();
+  if (!s) { alert('CRON_SECRET が未設定のため運用操作は実行できません'); return {}; }
+  return { 'X-Cron-Secret': s };
+}
+
+async function apiFetch(path, method = 'GET', body = null, extra = {}) {
+  // Party-scoped reads need an identified subject + purpose code (S-5/S-7).
+  // This is an operator console: read under the operator scope, purpose P06.
+  const s = sessionStorage.getItem('zenith_cron_secret');
+  const readH = (method === 'GET' && path.startsWith('/api/'))
+    ? (s ? { 'X-Cron-Secret': s, 'X-Purpose-Code': 'P06' } : { 'X-Purpose-Code': 'P06' })
+    : {};
+  const opts = { method, headers: { 'Content-Type': 'application/json', ...readH, ...extra } };
+  if (body) opts.body = JSON.stringify(body);
+  const r = await fetch(path, opts);
+  return r.json();
+}
+
+document.addEventListener('alpine:init', () => {
+  Alpine.data('zcConsole', () => ({
+    role: 'ops',
+    roles: [
+      { key: 'ops',   label: '運用',   icon: 'fa-solid fa-display' },
+      { key: 'liq',   label: '流動性', icon: 'fa-solid fa-droplet' },
+      { key: 'biz',   label: '企画',   icon: 'fa-solid fa-briefcase' },
+      { key: 'sre',   label: 'SRE',    icon: 'fa-solid fa-server' },
+      { key: 'audit', label: '監査',   icon: 'fa-solid fa-clipboard-check' },
+      { key: 'admin', label: '運営',   icon: 'fa-solid fa-shield-halved' },
+    ],
+    banks: [],
+    txs: [],
+    dnsStatus: {},
+    dnsPos: [],
+    bojPositions: [],
+    bojAsOf: '',
+    circuits: [],
+    systemMode: { mode: 'NORMAL' },
+    loading: false,
+    lastRefresh: '-',
+    auditSel: null,
+    auditView: 'explain',
+    auditData: {},
+    auditBusy: false,
+    sreMsg: '',
+    cbMsg: '',
+    adminMsg: '',
+    notifications: { sent: 0, retry: 0, failed: 0 },
+    acctVerifyStats: { matched: 0, unmatched: 0, notFound: 0 },
+    crossBorder: { count: 0, volume: 0 },
+    qrAlias: { qr: 0, alias: 0 },
+
+    openSidebar() {
+      document.getElementById('consoleSidebar').classList.add('open');
+      document.getElementById('consoleOverlay').classList.add('open');
+      document.body.style.overflow = 'hidden';
+    },
+    closeSidebar() {
+      document.getElementById('consoleSidebar').classList.remove('open');
+      document.getElementById('consoleOverlay').classList.remove('open');
+      document.body.style.overflow = '';
+    },
+
+    async init() {
+      await this.refresh();
+      setInterval(() => this.refresh(), 5000);
+    },
+
+    async refresh() {
+      const today = new Date().toISOString().slice(0,10);
+      try {
+        const [b, t, ds, dp, sm, boj, cb] = await Promise.all([
+          apiFetch('/api/banks'),
+          apiFetch('/api/transactions?limit=200'),
+          apiFetch(`/api/dns/${today}/status`),
+          apiFetch(`/api/dns/${today}/position`),
+          apiFetch('/api/system-mode'),
+          apiFetch('/api/boj/positions'),
+          apiFetch('/api/circuit-breaker'),
+        ]);
+        this.banks        = b.banks ?? b ?? [];
+        this.txs          = t.transactions ?? t ?? [];
+        this.dnsStatus    = ds ?? {};
+        this.dnsPos       = dp.positions ?? dp ?? [];
+        this.systemMode   = sm ?? { mode: 'NORMAL' };
+        this.bojPositions = boj.positions ?? [];
+        this.bojAsOf      = (boj.as_of ?? '').replace('T',' ').slice(0,19);
+        this.circuits     = cb.circuit_breakers ?? [];
+      } catch(e) { console.error('refresh error', e); }
+
+      // Compute derived stats from transactions
+      const settled = this.txs.filter(t => t.state === 'SETTLED');
+      const failedTxs = this.txs.filter(t => t.state === 'FAILED_EXECUTION');
+      const processing = this.txs.filter(t => t.state && !['SETTLED','FAILED_EXECUTION','CANCELLED'].includes(t.state));
+      this.notifications = {
+        sent: settled.length,
+        retry: processing.length,
+        failed: failedTxs.length,
+      };
+
+      const htlcGtid = this.txs.filter(t => t.lane === 'HTLC' || t.lane === 'GTID');
+      this.crossBorder = {
+        count: htlcGtid.length,
+        volume: htlcGtid.reduce((sum, t) => sum + (t.amount?.value || 0), 0),
+      };
+
+      // Approximate account verification stats from settled vs failed
+      this.acctVerifyStats = {
+        matched: settled.length,
+        unmatched: this.txs.filter(t => t.state === 'CANCELLED').length,
+        notFound: failedTxs.length,
+      };
+
+      // QR/Alias approximation: RTP lane as QR proxy, PSPR references as alias
+      this.qrAlias = {
+        qr: this.txs.filter(t => t.lane === 'RTP').length,
+        alias: this.txs.filter(t => t.lane === 'EXPRESS' && t.payee_alias).length,
+      };
+
+      this.lastRefresh = new Date().toLocaleTimeString('ja-JP');
+      this.$nextTick(() => this.drawCharts());
+    },
+
+    fmt,
+
+    get kpi() {
+      const settled = this.txs.filter(t => t.state === 'SETTLED').length;
+      const failed  = this.txs.filter(t => t.state === 'FAILED_EXECUTION').length;
+      return { total: this.txs.length, settled, failed, dns: this.dnsStatus.state ?? '-' };
+    },
+
+    get alerts() {
+      const a = [];
+      if (this.kpi.failed > 5) a.push({ level:'HIGH', msg:`失敗取引 ${this.kpi.failed}件` });
+      if (this.dnsStatus.state === 'HOLD_ACTIVE') a.push({ level:'HIGH', msg:'DNS HOLD_ACTIVE 状態' });
+      if (this.systemMode.mode && this.systemMode.mode !== 'NORMAL') a.push({ level:'HIGH', msg:`システム ${this.systemMode.mode}` });
+      const openCb = this.circuits.filter(c => c.state === 'OPEN').length;
+      if (openCb > 0) a.push({ level:'HIGH', msg:`CB遮断 ${openCb}行` });
+      return a;
+    },
+
+    bojBarPct(v) {
+      const max = this.bojPositions.reduce((m, p) => Math.max(m, Math.abs(p.boj_balance||0)), 1);
+      return Math.min(100, Math.round(Math.abs(v) / max * 100));
+    },
+
+    get bankRanking() {
+      const map = {};
+      for (const t of this.txs) {
+        if (!t.payer_bank_id) continue;
+        map[t.payer_bank_id] = (map[t.payer_bank_id] || 0) + (t.amount?.value || 0);
+      }
+      return Object.entries(map).map(([bank_id, total]) => ({ bank_id, total })).sort((a,b) => b.total - a.total);
+    },
+
+    drawCharts() {
+      if (this.role === 'ops')   this.drawLaneBar();
+      if (this.role === 'liq')   this.drawLiqGauges();
+      if (this.role === 'biz') { this.drawTimeline(); this.drawPie(); }
+      if (this.role === 'sre')   this.drawStateBar();
+    },
+
+    drawLaneBar() {
+      const el = document.getElementById('chartLaneBar');
+      if (!el) return;
+      const laneMap = {};
+      for (const t of this.txs) { const l = t.lane || 'UNKNOWN'; laneMap[l] = (laneMap[l]||0) + 1; }
+      const lanes = Object.keys(laneMap);
+      const chart = echarts.init(el);
+      chart.setOption({
+        tooltip: {},
+        xAxis: { type: 'category', data: lanes },
+        yAxis: { type: 'value' },
+        series: [{ type: 'bar', data: lanes.map(l => laneMap[l]), itemStyle: { color: '#8B4513' } }],
+      });
+    },
+
+    drawLiqGauges() {
+      const el = document.getElementById('chartLiqGauges');
+      if (!el) return;
+      el.innerHTML = '';
+      // 簡易表示: 各銀行のdnsポジションからゲージ代替
+      const shown = this.banks.slice(0, 10);
+      for (const bank of shown) {
+        const pos = this.dnsPos.find(p => p.bank_id === bank.bank_id);
+        const net = pos ? Math.abs((pos.credit_amount||0) - (pos.debit_amount||0)) : 0;
+        const max = this.dnsPos.reduce((a, p) => Math.max(a, Math.abs((p.credit_amount||0)-(p.debit_amount||0))), 1);
+        const pct = Math.round(net / max * 100);
+        const div = document.createElement('div');
+        div.className = 'text-center';
+        div.innerHTML = `<div class="text-[10px] text-gray-500 truncate">${esc(bank.bank_name || bank.bank_id)}</div>
+          <div id="gconsole-${bank.bank_id}" style="height:80px"></div>
+          <div class="text-[10px] text-gray-400">${pct}%</div>`;
+        el.appendChild(div);
+        const chart = echarts.init(div.querySelector(`#gconsole-${bank.bank_id}`));
+        chart.setOption({ series: [{ type:'gauge', min:0, max:100, radius:'90%',
+          axisLine: { lineStyle: { color: [[0.5,'#34d399'],[0.8,'#fbbf24'],[1,'#f87171']], width:8 } },
+          pointer: { length:'55%', width:3 }, axisTick:{show:false}, splitLine:{show:false}, axisLabel:{show:false},
+          detail: { show:false }, data: [{ value: pct }],
+        }] });
+      }
+    },
+
+    drawTimeline() {
+      const el = document.getElementById('chartTimeline');
+      if (!el) return;
+      const buckets = {};
+      for (const t of this.txs) {
+        if (!t.created_at) continue;
+        const h = t.created_at.slice(0, 13);
+        buckets[h] = (buckets[h]||0) + 1;
+      }
+      const keys = Object.keys(buckets).sort();
+      const chart = echarts.init(el);
+      chart.setOption({
+        tooltip: { trigger: 'axis' },
+        xAxis: { type: 'category', data: keys.map(k => k.slice(11) + ':00'), axisLabel: { fontSize: 10 } },
+        yAxis: { type: 'value' },
+        series: [{ type: 'line', data: keys.map(k => buckets[k]), smooth: true, areaStyle: { opacity: 0.1 }, itemStyle: { color: '#8B4513' } }],
+      });
+    },
+
+    drawPie() {
+      const el = document.getElementById('chartPie');
+      if (!el) return;
+      const map = {};
+      for (const t of this.txs) { const l = t.lane || 'UNKNOWN'; map[l] = (map[l]||0) + 1; }
+      const chart = echarts.init(el);
+      chart.setOption({
+        tooltip: { trigger: 'item' },
+        series: [{ type: 'pie', radius: ['40%','70%'],
+          data: Object.entries(map).map(([name,value]) => ({ name, value })),
+          label: { fontSize: 10 },
+        }],
+      });
+    },
+
+    drawStateBar() {
+      const el = document.getElementById('chartStateBar');
+      if (!el) return;
+      const map = {};
+      for (const t of this.txs) { const s = t.state||'UNKNOWN'; map[s] = (map[s]||0) + 1; }
+      const states = Object.keys(map);
+      const colors = { SETTLED:'#34d399', FAILED_EXECUTION:'#f87171', CANCELLED:'#f87171', RECEIVED:'#fbbf24', PROCESSING:'#60a5fa' };
+      const chart = echarts.init(el);
+      chart.setOption({
+        tooltip: {},
+        xAxis: { type: 'category', data: states, axisLabel: { fontSize: 9, rotate: 30 } },
+        yAxis: { type: 'value' },
+        series: [{ type: 'bar', data: states.map(s => ({ value: map[s], itemStyle: { color: colors[s]||'#9ca3af' } })) }],
+      });
+    },
+
+    async resetCircuit(bankId) {
+      this.cbMsg = `${bankId} をリセット中...`;
+      try {
+        const r = await apiFetch(`/api/circuit-breaker/${bankId}/reset`, 'POST');
+        this.cbMsg = `${bankId} をリセットしました (${r.result||'RESET'})`;
+        await this.refresh();
+      } catch(e) { this.cbMsg = 'Error: ' + e.message; }
+    },
+
+    // ---- 監査ツール ----
+    toggleAudit(txid) {
+      if (this.auditSel === txid) { this.auditSel = null; return; }
+      this.auditSel = txid;
+      this.auditView = 'explain';
+      this.auditData = {};
+      this.loadExplain(txid);
+    },
+
+    async loadExplain(txid) {
+      this.auditView = 'explain';
+      if (this.auditData.explain && this.auditData.explain.txid === txid) return;
+      this.auditBusy = true;
+      try { this.auditData.explain = await apiFetch(`/api/transactions/${txid}/explain`); }
+      catch(e) { this.auditData.explain = { summary: 'Error: ' + e.message, timeline: [] }; }
+      this.auditBusy = false;
+    },
+
+    async loadVerify(txid) {
+      this.auditBusy = true;
+      try { this.auditData.verify = await apiFetch(`/api/transactions/${txid}/verify`); }
+      catch(e) { this.auditData.verify = { valid: false, entries_checked: 0, break_at_seq: null }; }
+      this.auditBusy = false;
+    },
+
+    async loadStory(txid) {
+      this.auditView = 'story';
+      this.auditBusy = true;
+      try {
+        this.auditData.story = await apiFetch(`/api/transactions/${txid}/story`);
+        this.$nextTick(() => this.renderMermaid(txid));
+      } catch(e) { this.auditData.story = { headline: 'Error', narrative: e.message, mermaid_sequence: '' }; }
+      this.auditBusy = false;
+    },
+
+    async loadReversals(txid) {
+      this.auditView = 'reversals';
+      this.auditBusy = true;
+      try {
+        const r = await apiFetch(`/api/transactions/${txid}/reversals`);
+        this.auditData.reversals = r.reversals ?? [];
+      } catch(e) { this.auditData.reversals = []; }
+      this.auditBusy = false;
+    },
+
+    async renderMermaid(txid) {
+      const el = document.getElementById('mermaid-' + txid);
+      const src = this.auditData.story?.mermaid_sequence;
+      if (!el || !src || typeof mermaid === 'undefined') return;
+      try {
+        const { svg } = await mermaid.render('mmd-' + txid + '-' + Date.now(), src);
+        el.innerHTML = svg;
+      } catch(e) {
+        el.innerHTML = `<pre class="mono text-[10px] text-gray-500 whitespace-pre-wrap">${src.replace(/</g,'&lt;')}</pre>`;
+      }
+    },
+
+    async doSweep() {
+      try {
+        const r = await apiFetch('/internal/cron/timeout-sweep', 'POST', null, cronH());
+        this.sreMsg = 'タイムアウト巡回完了: swept=' + (r.swept||0);
+      } catch(e) { this.sreMsg = 'Error: ' + e.message; }
+    },
+
+    async doEod() {
+      try {
+        const r = await apiFetch('/internal/cron/eod', 'POST', null, cronH());
+        this.sreMsg = this.adminMsg = 'EOD完了: ' + JSON.stringify(r).slice(0, 80);
+      } catch(e) { this.sreMsg = this.adminMsg = 'Error: ' + e.message; }
+    },
+
+    async doSeed() {
+      try {
+        await apiFetch('/internal/seed', 'POST', null, cronH());
+        this.adminMsg = 'シードリセット完了';
+        await this.refresh();
+      } catch(e) { this.adminMsg = 'Error: ' + e.message; }
+    },
+
+    async doDnsKick() {
+      try {
+        const r = await apiFetch('/internal/dns/kick', 'POST', null, cronH());
+        this.adminMsg = 'DNS Kick完了: cycle_id=' + (r.cycle_id || '-');
+      } catch(e) { this.adminMsg = 'Error: ' + e.message; }
+    },
+  }));
+});
+</script>
+</body>
+</html>

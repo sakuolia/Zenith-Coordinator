@@ -1,0 +1,3092 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Zenith Clearing</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      fontFamily: {
+        jp: ['"Noto Sans JP"','"Hiragino Sans"','"Yu Gothic"','sans-serif'],
+        serif: ['"source-han-serif-japanese"','"Hiragino Mincho ProN"','"Yu Mincho"','serif'],
+      },
+      colors: {
+        brand: {
+          50:  '#eef4ff',
+          100: '#d9e8fb',
+          200: '#a8c9f5',
+          300: '#6aaae8',
+          500: '#003366',
+          600: '#0066CC',
+          700: '#004499',
+        },
+        accent: '#FF6600',
+      },
+    }
+  }
+}
+</script>
+<style>
+  .mono{font-family:'SF Mono','Consolas','Courier New',monospace;font-size:.78rem}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+  .fade-in{animation:fadeIn .2s ease}
+  @keyframes slideIn{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:none}}
+  .slide-in{animation:slideIn .3s ease}
+  [data-page-content]{display:none}
+  [data-page-content].active{display:block}
+  #sidebar { transition: transform .28s cubic-bezier(.4,0,.2,1); }
+  #sidebarOverlay { display:none; }
+  #sidebarOverlay.open { display:block; }
+  @media (max-width: 767px) {
+    #sidebar { transform: translateX(-100%); }
+    #sidebar.open { transform: translateX(0); }
+  }
+</style>
+</head>
+<body class="bg-gray-50 font-jp text-gray-800 min-h-screen">
+
+<!-- Mobile overlay -->
+<div id="sidebarOverlay" class="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm" onclick="closeSidebar()"></div>
+
+<!-- Sidebar -->
+<aside id="sidebar" class="fixed left-0 top-0 h-full w-56 bg-white border-r border-gray-200 flex flex-col z-50">
+  <div class="px-5 py-5 border-b border-gray-100">
+    <div class="font-serif text-xl tracking-widest text-brand-500">Zenith</div>
+    <div class="text-[10px] text-gray-400 tracking-wider mt-0.5">Clearing System</div>
+  </div>
+  <nav id="mainNav" class="flex-1 py-3 space-y-0.5 overflow-y-auto">
+    <!-- ── モニタリング ── -->
+    <button data-page="overview" class="nav-btn active w-full text-left px-5 py-2.5 text-sm flex items-center gap-3 border-l-[3px] border-transparent hover:bg-gray-50 transition-colors">
+      <i class="fa-solid fa-chart-line w-5 text-center text-gray-400"></i> 総覧
+    </button>
+    <button data-page="liquidity" class="nav-btn w-full text-left px-5 py-2.5 text-sm flex items-center gap-3 border-l-[3px] border-transparent hover:bg-gray-50 transition-colors">
+      <i class="fa-solid fa-gauge-high w-5 text-center text-gray-400"></i> 流動性
+    </button>
+    <button data-page="network" class="nav-btn w-full text-left px-5 py-2.5 text-sm flex items-center gap-3 border-l-[3px] border-transparent hover:bg-gray-50 transition-colors">
+      <i class="fa-solid fa-globe w-5 text-center text-gray-400"></i> ネットワーク
+    </button>
+    <!-- ── 送金オペレーション ── -->
+    <div class="mt-2 pt-2 border-t border-gray-100">
+      <div class="px-5 py-1 text-[10px] text-gray-400 uppercase tracking-wider">送金</div>
+    </div>
+    <button data-page="transfer" class="nav-btn w-full text-left px-5 py-2.5 text-sm flex items-center gap-3 border-l-[3px] border-transparent hover:bg-gray-50 transition-colors">
+      <i class="fa-solid fa-paper-plane w-5 text-center text-gray-400"></i> 送金
+    </button>
+    <button data-page="htlc" class="nav-btn w-full text-left px-5 py-2.5 text-sm flex items-center gap-3 border-l-[3px] border-transparent hover:bg-gray-50 transition-colors">
+      <i class="fa-solid fa-lock w-5 text-center text-gray-400"></i> HTLC
+    </button>
+    <button data-page="gtid" class="nav-btn w-full text-left px-5 py-2.5 text-sm flex items-center gap-3 border-l-[3px] border-transparent hover:bg-gray-50 transition-colors">
+      <i class="fa-solid fa-code-branch w-5 text-center text-gray-400"></i> GTID
+    </button>
+    <button data-page="fx" class="nav-btn w-full text-left px-5 py-2.5 text-sm flex items-center gap-3 border-l-[3px] border-transparent hover:bg-gray-50 transition-colors">
+      <i class="fa-solid fa-money-bill-transfer w-5 text-center text-gray-400"></i> FX 外貨両替
+    </button>
+    <button data-page="dns" class="nav-btn w-full text-left px-5 py-2.5 text-sm flex items-center gap-3 border-l-[3px] border-transparent hover:bg-gray-50 transition-colors">
+      <i class="fa-solid fa-rotate w-5 text-center text-gray-400"></i> DNS清算
+    </button>
+    <!-- ── 銀行・勘定管理 ── -->
+    <div class="mt-2 pt-2 border-t border-gray-100">
+      <div class="px-5 py-1 text-[10px] text-gray-400 uppercase tracking-wider">管理</div>
+    </div>
+    <button data-page="bank" class="nav-btn w-full text-left px-5 py-2.5 text-sm flex items-center gap-3 border-l-[3px] border-transparent hover:bg-gray-50 transition-colors">
+      <i class="fa-solid fa-building-columns w-5 text-center text-gray-400"></i> 銀行管理
+    </button>
+    <button data-page="cases" class="nav-btn w-full text-left px-5 py-2.5 text-sm flex items-center gap-3 border-l-[3px] border-transparent hover:bg-gray-50 transition-colors">
+      <i class="fa-solid fa-triangle-exclamation w-5 text-center text-gray-400"></i> ケース管理
+    </button>
+    <button data-page="trace" class="nav-btn w-full text-left px-5 py-2.5 text-sm flex items-center gap-3 border-l-[3px] border-transparent hover:bg-gray-50 transition-colors">
+      <i class="fa-solid fa-magnifying-glass w-5 text-center text-gray-400"></i> トレース
+    </button>
+    <!-- ── システム・ツール ── -->
+    <div class="mt-2 pt-2 border-t border-gray-100">
+      <div class="px-5 py-1 text-[10px] text-gray-400 uppercase tracking-wider">ツール</div>
+    </div>
+    <button data-page="simulator" class="nav-btn w-full text-left px-5 py-2.5 text-sm flex items-center gap-3 border-l-[3px] border-transparent hover:bg-gray-50 transition-colors">
+      <i class="fa-solid fa-play w-5 text-center text-gray-400"></i> シミュレーター
+    </button>
+    <button data-page="ops" class="nav-btn w-full text-left px-5 py-2.5 text-sm flex items-center gap-3 border-l-[3px] border-transparent hover:bg-gray-50 transition-colors">
+      <i class="fa-solid fa-wrench w-5 text-center text-gray-400"></i> 運用
+    </button>
+    <button data-page="apispec" class="nav-btn w-full text-left px-5 py-2.5 text-sm flex items-center gap-3 border-l-[3px] border-transparent hover:bg-gray-50 transition-colors">
+      <i class="fa-solid fa-file-code w-5 text-center text-gray-400"></i> API仕様
+    </button>
+    <button data-page="documentation" class="nav-btn w-full text-left px-5 py-2.5 text-sm flex items-center gap-3 border-l-[3px] border-transparent hover:bg-gray-50 transition-colors">
+      <i class="fa-solid fa-book w-5 text-center text-gray-400"></i> ドキュメント
+    </button>
+    <!-- ── 新決済機能 ── -->
+    <div class="mt-2 pt-2 border-t border-gray-100">
+      <div class="px-5 py-1 text-[10px] text-gray-400 uppercase tracking-wider">新決済機能</div>
+    </div>
+    <button data-page="acctverify" class="nav-btn w-full text-left px-5 py-2.5 text-sm flex items-center gap-3 border-l-[3px] border-transparent hover:bg-gray-50 transition-colors">
+      <i class="fa-solid fa-user-check w-5 text-center text-gray-400"></i> 口座確認
+    </button>
+    <button data-page="proxy" class="nav-btn w-full text-left px-5 py-2.5 text-sm flex items-center gap-3 border-l-[3px] border-transparent hover:bg-gray-50 transition-colors">
+      <i class="fa-solid fa-address-book w-5 text-center text-gray-400"></i> Proxy管理
+    </button>
+    <button data-page="creditnotify" class="nav-btn w-full text-left px-5 py-2.5 text-sm flex items-center gap-3 border-l-[3px] border-transparent hover:bg-gray-50 transition-colors">
+      <i class="fa-solid fa-bell w-5 text-center text-gray-400"></i> 入金通知
+    </button>
+    <button data-page="qrcode" class="nav-btn w-full text-left px-5 py-2.5 text-sm flex items-center gap-3 border-l-[3px] border-transparent hover:bg-gray-50 transition-colors">
+      <i class="fa-solid fa-qrcode w-5 text-center text-gray-400"></i> QRコード
+    </button>
+    <button data-page="crossborder" class="nav-btn w-full text-left px-5 py-2.5 text-sm flex items-center gap-3 border-l-[3px] border-transparent hover:bg-gray-50 transition-colors">
+      <i class="fa-solid fa-earth-americas w-5 text-center text-gray-400"></i> クロスボーダー
+    </button>
+    <button data-page="edi" class="nav-btn w-full text-left px-5 py-2.5 text-sm flex items-center gap-3 border-l-[3px] border-transparent hover:bg-gray-50 transition-colors">
+      <i class="fa-solid fa-file-invoice w-5 text-center text-gray-400"></i> EDI/リッチデータ
+    </button>
+  </nav>
+  <div class="px-3 py-2 border-t border-gray-100 space-y-1">
+    <a href="/console"  target="_blank" class="block text-xs text-gray-400 hover:text-brand-600 px-2 py-1"><i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i> オペコンソール</a>
+    <a href="/bank-app" target="_blank" class="block text-xs text-gray-400 hover:text-brand-600 px-2 py-1"><i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i> 銀行アプリ</a>
+    <a href="/theater"  target="_blank" class="block text-xs text-gray-400 hover:text-brand-600 px-2 py-1"><i class="fa-solid fa-masks-theater text-[10px]"></i> シアター（取引再生）</a>
+    <a href="/sky"      target="_blank" class="block text-xs text-gray-400 hover:text-brand-600 px-2 py-1"><i class="fa-solid fa-moon text-[10px]"></i> Sky（決済の鼓動）</a>
+  </div>
+  <div class="px-5 py-3 border-t border-gray-100 text-[10px] text-gray-400">
+    <div id="sidebarStatus">System Ready</div>
+  </div>
+</aside>
+
+<!-- Main Content -->
+<div class="md:ml-56 min-h-screen">
+  <header class="sticky top-0 z-40 bg-white/90 backdrop-blur border-b border-gray-200 px-4 md:px-6 py-3 flex items-center justify-between gap-3">
+    <div class="flex items-center gap-3 min-w-0">
+      <!-- Hamburger (mobile only) -->
+      <button onclick="toggleSidebar()" class="md:hidden flex-shrink-0 w-9 h-9 flex flex-col items-center justify-center gap-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors">
+        <span class="block w-5 h-0.5 bg-gray-600 rounded"></span>
+        <span class="block w-5 h-0.5 bg-gray-600 rounded"></span>
+        <span class="block w-5 h-0.5 bg-gray-600 rounded"></span>
+      </button>
+      <h1 id="pageTitle" class="text-base md:text-lg font-medium text-gray-700 truncate"></h1>
+    </div>
+    <button onclick="renderPage(currentPage)" class="flex-shrink-0 text-xs text-gray-400 hover:text-gray-600 px-3 py-1 rounded border border-gray-200 hover:border-gray-300 transition-colors"><i class="fa-solid fa-arrows-rotate"></i> 更新</button>
+  </header>
+  <div class="p-4 md:p-6" id="app"></div>
+</div>
+
+<!-- Toast -->
+<div id="toast" class="fixed bottom-6 right-6 z-[999] flex flex-col gap-2"></div>
+
+<!-- TX Timeline Modal -->
+<div id="txModal" class="hidden fixed inset-0 z-[900] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4" onclick="if(event.target===this)closeTxModal()">
+  <div class="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[85vh] flex flex-col">
+    <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+      <div>
+        <div class="text-sm font-semibold text-gray-700">取引タイムライン</div>
+        <div id="txModalId" class="mono text-[11px] text-gray-400 mt-0.5"></div>
+      </div>
+      <button onclick="closeTxModal()" class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 text-xl">&times;</button>
+    </div>
+    <div class="px-6 py-4 border-b border-gray-100 grid grid-cols-2 md:grid-cols-4 gap-4" id="txModalMeta"></div>
+    <div class="flex-1 overflow-y-auto px-6 py-4">
+      <div class="text-[11px] text-gray-400 uppercase tracking-wider mb-3 font-medium">処理ステップ</div>
+      <div id="txModalTimeline" class="space-y-2"></div>
+    </div>
+    <div class="px-6 py-3 border-t border-gray-100 flex justify-between items-center gap-2">
+      <div class="flex gap-2">
+        <a id="txModalTheaterLink" href="#" target="_blank" class="text-sm px-4 py-2 rounded-lg bg-brand-600 text-white hover:bg-brand-700 transition-colors"><i class="fa-solid fa-masks-theater mr-1"></i>シアターで観劇</a>
+      </div>
+      <button onclick="closeTxModal()" class="text-sm px-4 py-2 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors">閉じる</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const BASE = location.origin;
+let banks = [], currentPage = 'overview';
+const PAGE_TITLES = { overview:'総覧', transfer:'送金', bank:'銀行管理', htlc:'HTLC 条件付き送金', gtid:'GTID 協調送金', fx:'FX 外貨両替', dns:'DNS清算', ops:'運用操作', liquidity:'流動性モニター', network:'ネットワークグラフ', simulator:'シミュレーター', cases:'ケース管理', trace:'イベントトレース', apispec:'API仕様書', documentation:'ドキュメント', acctverify:'事前口座確認', proxy:'Proxyディレクトリ', creditnotify:'入金結果通知', qrcode:'QRコード送金', crossborder:'クロスボーダー送金', edi:'EDI/リッチデータ' };
+
+// ========== Helpers ==========
+async function api(method, path, body, headers = {}) {
+  // Party-scoped reads require an identified subject and a purpose code
+  // (requirements S-5/S-7, docs/specs/32_api_contracts.md § 照会の認可). This console
+  // is an operator surface, so it reads under the operator scope; the secret is
+  // never baked into this artifact (see getCronSecret below).
+  const readH = (method === 'GET' && path.startsWith('/api/')) ? opsReadH() : {};
+  const opts = { method, headers: { 'Content-Type': 'application/json', ...readH, ...headers } };
+  if (body) opts.body = JSON.stringify(body);
+  const r = await fetch(BASE + path, opts);
+  return r.json();
+}
+// Operator read headers. Purpose P06 (障害解析) is the console's standing purpose:
+// it is the one an operations dashboard is actually exercising.
+function opsReadH() {
+  const s = sessionStorage.getItem('zenith_cron_secret');
+  return s ? { 'X-Cron-Secret': s, 'X-Purpose-Code': 'P06' } : { 'X-Purpose-Code': 'P06' };
+}
+function tellerH(bankId) { return { 'X-Bank-Id': bankId, 'X-Teller-Id': 'TELLER-1' }; }
+// The CRON_SECRET must never be baked into this served artifact (anyone could
+// view-source it and drive every /internal/* operation). It is entered by the
+// operator and kept only in sessionStorage (cleared when the tab closes). No
+// secret → no header → the server's fail-closed gate returns 403.
+function getCronSecret() {
+  let s = sessionStorage.getItem('zenith_cron_secret');
+  if (!s) {
+    s = (prompt('運用操作には X-Cron-Secret が必要です。環境に設定した CRON_SECRET を入力してください:') || '').trim();
+    if (s) sessionStorage.setItem('zenith_cron_secret', s);
+  }
+  return s;
+}
+function cronH() {
+  const s = getCronSecret();
+  if (!s) { toast('CRON_SECRET が未設定のため運用操作は実行できません', 'error'); return {}; }
+  return { 'X-Cron-Secret': s };
+}
+function uuid() { return crypto.randomUUID(); }
+// Every money-movement button below generates a fresh idempotency_key per
+// invocation, so a rapid double-click is two distinct logical requests from
+// the server's point of view — the backend's idempotency dedup cannot help.
+// Disable the clicked button for the duration of the handler (covering every
+// return path: validation errors, success, and the catch block) so a double-
+// click can only ever produce one in-flight request.
+async function withSubmitGuard(evt, fn) {
+  const btn = evt?.currentTarget;
+  if (btn?.disabled) return;
+  if (btn) btn.disabled = true;
+  try { await fn(); } finally { if (btn) btn.disabled = false; }
+}
+
+function toast(msg, type = 'info') {
+  const colors = { error: 'border-red-400 bg-red-50', success: 'border-emerald-400 bg-emerald-50', info: 'border-amber-400 bg-amber-50' };
+  const d = document.createElement('div');
+  d.className = `slide-in border-l-4 ${colors[type]||colors.info} bg-white shadow-lg rounded px-4 py-3 text-sm max-w-sm`;
+  d.textContent = msg;
+  document.getElementById('toast').appendChild(d);
+  setTimeout(() => d.remove(), 4000);
+}
+
+function badge(state) {
+  const m = {
+    'SETTLED':'bg-emerald-100 text-emerald-700','NORMAL':'bg-emerald-100 text-emerald-700','OK':'bg-emerald-100 text-emerald-700',
+    'MATCH':'bg-emerald-100 text-emerald-700','CREATED':'bg-emerald-100 text-emerald-700',
+    'DECIDED_TO_SETTLE':'bg-blue-100 text-blue-700','H_RESERVED':'bg-blue-100 text-blue-700','PRECHECKED':'bg-blue-100 text-blue-700',
+    'HTLC_LOCKED':'bg-blue-100 text-blue-700','HTLC_FULFILL_REQUESTED':'bg-indigo-100 text-indigo-700',
+    'GT_DECIDED_TO_SETTLE':'bg-blue-100 text-blue-700','GT_PRECHECKED':'bg-blue-100 text-blue-700',
+    'GT_SETTLED':'bg-emerald-100 text-emerald-700','LEG_SETTLED':'bg-emerald-100 text-emerald-700',
+    'RECEIVED':'bg-amber-100 text-amber-700','PROCESSING':'bg-amber-100 text-amber-700','HTLC_RECEIVED':'bg-amber-100 text-amber-700',
+    'GT_RECEIVED':'bg-amber-100 text-amber-700','CUSTODY':'bg-amber-100 text-amber-700','FROZEN':'bg-amber-100 text-amber-700',
+    'EXECUTED':'bg-amber-100 text-amber-700','RESERVED':'bg-amber-100 text-amber-700',
+    'LEG_REGISTERED':'bg-amber-100 text-amber-700','LEG_READY_CHECKED':'bg-blue-100 text-blue-700',
+    'LEG_PAYER_CONFIRMED':'bg-blue-100 text-blue-700','LEG_PAYEE_CONFIRMED':'bg-blue-100 text-blue-700',
+    'DECIDED_CANCEL':'bg-red-100 text-red-700','CANCELLED':'bg-red-100 text-red-700','FAILED_EXECUTION':'bg-red-100 text-red-700',
+    'SUSPENDED':'bg-red-100 text-red-700','CLOSED':'bg-red-100 text-red-700',
+    'GT_DECIDED_CANCEL':'bg-red-100 text-red-700','GT_CANCELLED':'bg-red-100 text-red-700','GT_FAILED':'bg-red-100 text-red-700',
+    'LEG_FAILED':'bg-red-100 text-red-700','LEG_SUSPENDED':'bg-red-100 text-red-700',
+  };
+  const cls = m[state] || 'bg-gray-100 text-gray-600';
+  return `<span class="inline-block rounded-full px-2.5 py-0.5 text-[11px] font-medium ${cls}">${state}</span>`;
+}
+
+function fmtAmt(v) { return Number(v).toLocaleString('ja-JP') + ' 円'; }
+// Real-money amount fields are JPY integers. parseInt("9999.99") silently
+// truncates to 9999 with no indication to the operator that what gets
+// submitted differs from what was typed. Returns NaN for anything that
+// isn't a plain non-negative integer string so callers must handle it
+// explicitly instead of having it silently coerced.
+function parseAmount(v) {
+  const s = String(v ?? '').trim();
+  return /^\d+$/.test(s) ? parseInt(s, 10) : NaN;
+}
+// Foreign-currency fields (e.g. cross-border send) accept human-typed decimal
+// amounts (USD "100.50") but the backend stores an integer count of the
+// currency's minor unit (USD 100.50 -> 10050), never a float. Parses the
+// string ourselves (no parseFloat * 10**n) to avoid floating-point precision
+// loss, and rejects more fractional digits than the currency supports.
+const CURRENCY_DECIMAL_PLACES = { JPY: 0, USD: 2, EUR: 2 };
+function parseCurrencyAmount(v, currency) {
+  const decimals = CURRENCY_DECIMAL_PLACES[currency] ?? 0;
+  const s = String(v ?? '').trim();
+  const re = decimals > 0 ? new RegExp(`^\\d+(\\.\\d{1,${decimals}})?$`) : /^\d+$/;
+  if (!re.test(s)) return NaN;
+  const [intPart, fracPart = ''] = s.split('.');
+  return parseInt(intPart + fracPart.padEnd(decimals, '0'), 10);
+}
+function fmtDate(s) { return s ? s.replace('T', ' ').replace('Z','').slice(0, 23) : '-'; }
+// customer_name / bank_name are attacker-influenceable free text (server only
+// checks non-empty, never sanitizes — see teller_api.ts / admin.ts) that this
+// dashboard interpolates into innerHTML all over the place. Escape at every
+// such boundary; never escape values destined for canvas-rendered labels
+// (e.g. echarts node `name`) or outgoing request bodies, since those aren't
+// HTML sinks and escaping there would corrupt the displayed/sent text.
+function esc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+}
+function bankName(id) { const b = banks.find(x => x.bank_id === id); return b ? esc(b.bank_name) : esc(id) || '-'; }
+
+function card(title, body, extra = '') {
+  return `<div class="bg-white rounded-lg shadow-sm border border-gray-200 p-5 mb-4 fade-in ${extra}"><h3 class="font-medium text-gray-700 text-sm mb-4 pb-2 border-b border-gray-100">${title}</h3>${body}</div>`;
+}
+
+function subnav(id, items) {
+  return `<div id="${id}" class="flex border-b border-gray-200 mb-4 gap-0">${items.map((it,i) =>
+    `<button data-tab="${it.key}" class="px-4 py-2 text-sm border-b-2 ${i===0?'border-brand-500 text-brand-600':'border-transparent text-gray-400 hover:text-gray-600'} transition-colors">${it.label}</button>`
+  ).join('')}</div>`;
+}
+
+function bindSubnav(navId, callback) {
+  document.querySelectorAll(`#${navId} button`).forEach(b => b.onclick = () => {
+    document.querySelectorAll(`#${navId} button`).forEach(x => { x.classList.remove('border-brand-500','text-brand-600'); x.classList.add('border-transparent','text-gray-400'); });
+    b.classList.add('border-brand-500','text-brand-600'); b.classList.remove('border-transparent','text-gray-400');
+    callback(b.dataset.tab);
+  });
+}
+
+// ========== Pages ==========
+async function loadBanks() { const r = await api('GET', '/api/banks'); banks = r.banks || []; }
+
+async function renderPage(page) {
+  currentPage = page;
+  document.querySelectorAll('.nav-btn').forEach(b => {
+    const isActive = b.dataset.page === page;
+    b.classList.toggle('bg-brand-50', isActive);
+    b.classList.toggle('text-brand-600', isActive);
+    b.classList.toggle('border-brand-500', isActive);
+    b.classList.toggle('font-medium', isActive);
+    b.classList.toggle('text-gray-600', !isActive);
+    b.classList.toggle('border-transparent', !isActive);
+  });
+  document.getElementById('pageTitle').textContent = PAGE_TITLES[page] || page;
+  const app = document.getElementById('app');
+  app.innerHTML = '<div class="text-center py-16 text-gray-400 text-sm">読み込み中...</div>';
+  await loadBanks();
+  switch(page) {
+    case 'overview': return renderOverview();
+    case 'transfer': return renderTransfer();
+    case 'bank': return renderBankMgmt();
+    case 'htlc': return renderHtlc();
+    case 'gtid': return renderGtid();
+    case 'fx': return renderFx();
+    case 'dns': return renderDns();
+    case 'ops': return renderOps();
+    case 'liquidity': return renderLiquidity();
+    case 'network':   return renderNetwork();
+    case 'simulator': return renderSimulator();
+    case 'cases':     return renderCases();
+    case 'trace':     return renderTrace();
+    case 'apispec':   return renderApiSpec();
+    case 'documentation': return renderDocumentation();
+    case 'acctverify': return renderAcctVerify();
+    case 'proxy': return renderProxy();
+    case 'creditnotify': return renderCreditNotify();
+    case 'qrcode': return renderQrCode();
+    case 'crossborder': return renderCrossBorder();
+    case 'edi': return renderEdi();
+  }
+}
+
+// ---------- Overview ----------
+const laneLabel = l => ({'EXPRESS':'即時','STANDARD':'通常','BULK':'一括','HIGH_VALUE':'大口','HTLC':'HTLC','RTP':'請求払','GTID':'協調(GTID)','DEFERRED':'協調(leg)'})[l] || l;
+
+async function renderOverview(q = {}) {
+  const page = q.page || 1;
+  const limit = 50;
+  const offset = (page - 1) * limit;
+  const params = new URLSearchParams({ limit: limit.toString(), offset: offset.toString() });
+  if (q.txid)     params.set('txid',      q.txid);
+  if (q.account)  params.set('account',   q.account);
+  if (q.dateFrom) params.set('date_from', q.dateFrom + 'T00:00:00Z');
+  if (q.dateTo)   params.set('date_to',   q.dateTo   + 'T23:59:59Z');
+
+  const [txRes, dnsRes, gtidRes] = await Promise.all([
+    api('GET', '/api/transactions?' + params.toString()),
+    api('GET', `/api/dns/${new Date().toISOString().slice(0,10)}/status`),
+    q.txid ? Promise.resolve({ gtids: [], total_count: 0 }) : api('GET', `/api/gtid?limit=${limit}&offset=${offset}`),
+  ]);
+  // GTID は GtidTransactions テーブル（Transactions テーブルとは別管理）なので統合して表示
+  const regularTxs = txRes.transactions || [];
+  const gtidRows = (gtidRes.gtids || [])
+    .filter(g => !q.account || g.initiator_bank_id === (q.account.slice(0,3)) )
+    .map(g => ({
+      txid: g.gtid, lane: 'GTID', state: g.state,
+      amount_value: g.total_amount, payer_bank_id: g.initiator_bank_id,
+      payer_account_hash: null, payee_bank_id: null,
+      payee_account_hash: `${g.leg_count}leg`, created_at: g.created_at,
+    }));
+  const txs = [...regularTxs, ...gtidRows]
+    .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
+    .slice(0, limit);
+
+  const totalTxs = (txRes.total_count || txs.length) + (gtidRes.total_count || 0);
+  const maxPage = Math.max(1, Math.ceil(totalTxs / limit));
+
+  const searchHtml = `
+    <div class="bg-white border border-gray-200 rounded-lg p-3 mb-4 flex flex-wrap items-end gap-2 text-sm">
+      <div class="flex flex-col gap-0.5">
+        <label class="text-[10px] text-gray-400">取引ID（前方一致）</label>
+        <input id="ovTxid" type="text" placeholder="TX-..." value="${q.txid||''}"
+          class="border border-gray-200 rounded px-2 py-1 text-xs w-48 font-mono">
+      </div>
+      <div class="flex flex-col gap-0.5">
+        <label class="text-[10px] text-gray-400">口座番号（仕向/被仕向）</label>
+        <input id="ovAccount" type="text" placeholder="0010000001" value="${q.account||''}"
+          class="border border-gray-200 rounded px-2 py-1 text-xs w-36 font-mono">
+      </div>
+      <div class="flex flex-col gap-0.5">
+        <label class="text-[10px] text-gray-400">取引日（From）</label>
+        <input id="ovDateFrom" type="date" value="${q.dateFrom||''}"
+          class="border border-gray-200 rounded px-2 py-1 text-xs">
+      </div>
+      <div class="flex flex-col gap-0.5">
+        <label class="text-[10px] text-gray-400">取引日（To）</label>
+        <input id="ovDateTo" type="date" value="${q.dateTo||''}"
+          class="border border-gray-200 rounded px-2 py-1 text-xs">
+      </div>
+      <button onclick="doOverviewSearch()" class="bg-brand-500 hover:bg-brand-600 text-white px-3 py-1.5 rounded text-xs">検索</button>
+      <button onclick="window.currentOverviewQuery={}; renderOverview()" class="border border-gray-200 hover:bg-gray-50 px-3 py-1.5 rounded text-xs text-gray-500">リセット</button>
+    </div>`;
+
+  const paginationHtml = `
+    <div class="flex justify-between items-center mt-4">
+      <div class="text-xs text-gray-500">全 ${totalTxs} 件中 ${(page-1)*limit + (totalTxs > 0 ? 1 : 0)} - ${Math.min(page*limit, totalTxs)} 件目を表示</div>
+      <div class="flex gap-2 items-center">
+        <button onclick="changeOverviewPage(${page - 1})" class="px-3 py-1 border border-gray-200 rounded text-xs hover:bg-gray-50 disabled:opacity-50" ${page <= 1 ? 'disabled' : ''}>前へ</button>
+        <div class="px-3 py-1 text-xs text-gray-600">ページ ${page} / ${maxPage}</div>
+        <button onclick="changeOverviewPage(${page + 1})" class="px-3 py-1 border border-gray-200 rounded text-xs hover:bg-gray-50 disabled:opacity-50" ${page >= maxPage ? 'disabled' : ''}>次へ</button>
+      </div>
+    </div>`;
+
+  document.getElementById('app').innerHTML = `
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 fade-in">
+      <div class="bg-white rounded-lg border border-gray-200 p-4 text-center">
+        <div class="text-2xl font-serif text-brand-600">${banks.length}</div>
+        <div class="text-[11px] text-gray-400 mt-1">参加銀行</div>
+      </div>
+      <div class="bg-white rounded-lg border border-gray-200 p-4 text-center">
+        <div class="text-2xl font-serif text-brand-600">${totalTxs}</div>
+        <div class="text-[11px] text-gray-400 mt-1">総取引数</div>
+      </div>
+      <div class="bg-white rounded-lg border border-gray-200 p-4 text-center">
+        <div class="text-2xl font-serif text-brand-600">${txRes.transactions?.filter(t=>t.state==='SETTLED').length || 0}</div>
+        <div class="text-[11px] text-gray-400 mt-1">決済完了 (当ページ)</div>
+      </div>
+      <div class="bg-white rounded-lg border border-gray-200 p-4 text-center">
+        <div class="text-2xl">${badge(dnsRes.state||'NOT_STARTED')}</div>
+        <div class="text-[11px] text-gray-400 mt-1">DNS状態</div>
+      </div>
+    </div>
+    ${card('取引一覧 <span class="text-xs text-gray-400 font-normal">（行をクリックでトレース表示）</span>', `
+      ${searchHtml}
+      <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead><tr class="border-b border-gray-200 text-left">
+          <th class="pb-2 text-xs text-gray-400 font-medium">取引ID</th>
+          <th class="pb-2 text-xs text-gray-400 font-medium">レーン</th>
+          <th class="pb-2 text-xs text-gray-400 font-medium text-right">金額</th>
+          <th class="pb-2 text-xs text-gray-400 font-medium">仕向口座</th>
+          <th class="pb-2 text-xs text-gray-400 font-medium">被仕向口座</th>
+          <th class="pb-2 text-xs text-gray-400 font-medium">状態</th>
+          <th class="pb-2 text-xs text-gray-400 font-medium">日時</th>
+        </tr></thead>
+        <tbody class="divide-y divide-gray-100">${txs.map(t => {
+          const isBad = t.state === 'SUSPENDED' || t.state === 'CANCELLED' || t.state === 'FAIL_DEBIT' || t.state === 'FAIL_CREDIT';
+          return `<tr class="hover:bg-amber-50 cursor-pointer ${isBad ? 'bg-red-50/40' : ''}" onclick="showTxTimeline('${t.txid}')">
+          <td class="py-2 mono text-[11px]">${t.txid}</td>
+          <td class="py-2"><span class="text-xs bg-gray-100 text-gray-600 rounded px-1.5 py-0.5">${laneLabel(t.lane)}</span></td>
+          <td class="py-2 text-right">${fmtAmt(t.amount_value)}</td>
+          <td class="py-2 mono text-[11px]">${t.payer_account_hash || bankName(t.payer_bank_id)}</td>
+          <td class="py-2 mono text-[11px]">${t.payee_account_hash || bankName(t.payee_bank_id)}</td>
+          <td class="py-2">${badge(t.state)}</td>
+          <td class="py-2 text-[11px] text-gray-400">${fmtDate(t.created_at)}</td>
+        </tr>`;
+        }).join('')}</tbody>
+      </table></div>
+      ${paginationHtml}
+    `)}`;
+}
+
+function doOverviewSearch() {
+  window.currentOverviewQuery = {
+    txid:     document.getElementById('ovTxid')?.value.trim()    || '',
+    account:  document.getElementById('ovAccount')?.value.trim() || '',
+    dateFrom: document.getElementById('ovDateFrom')?.value       || '',
+    dateTo:   document.getElementById('ovDateTo')?.value         || '',
+    page:     1,
+  };
+  renderOverview(window.currentOverviewQuery);
+}
+
+window.changeOverviewPage = function(newPage) {
+  if (!window.currentOverviewQuery) window.currentOverviewQuery = {};
+  window.currentOverviewQuery.page = newPage;
+  renderOverview(window.currentOverviewQuery);
+}
+
+// ---------- Transfer ----------
+async function renderTransfer() {
+  const app = document.getElementById('app');
+  app.innerHTML = card('送金', `
+    ${subnav('txSubnav', [
+      {key:'EXPRESS', label:'即時送金'}, {key:'STANDARD', label:'通常送金'},
+      {key:'BULK', label:'一括送金'}, {key:'HIGH_VALUE', label:'大口送金'}, {key:'RTP', label:'請求払い'},
+    ])}
+    <div id="txForm"></div>
+  `) + `<div id="txResult"></div>`;
+  bindSubnav('txSubnav', renderTxForm);
+  renderTxForm('EXPRESS');
+}
+
+function renderTxForm(lane) {
+  const bankOpts = banks.map(b => `<option value="${b.bank_id}">${esc(b.bank_name)} (${b.bank_id})</option>`).join('');
+  document.getElementById('txForm').innerHTML = `
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div class="space-y-3">
+        <h4 class="text-xs font-medium text-gray-500 uppercase tracking-wider">仕向（支払人）</h4>
+        <div><label class="block text-xs text-gray-400 mb-1">銀行</label><select id="txPayerBank" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-1 focus:ring-brand-500 focus:border-brand-500">${bankOpts}</select></div>
+        <div><label class="block text-xs text-gray-400 mb-1">口座</label><select id="txPayerAcct" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-1 focus:ring-brand-500 focus:border-brand-500"><option>読込中...</option></select></div>
+        <div><label class="block text-xs text-gray-400 mb-1">金額 (円)</label><input type="number" id="txAmount" value="10000" min="1" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-1 focus:ring-brand-500 focus:border-brand-500"></div>
+      </div>
+      <div class="space-y-3">
+        <h4 class="text-xs font-medium text-gray-500 uppercase tracking-wider">被仕向（受取人）</h4>
+        <div><label class="block text-xs text-gray-400 mb-1">口座番号（10桁）</label><input type="text" id="txPayeeAcct" placeholder="例: 0020000001" maxlength="10" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm font-mono focus:ring-1 focus:ring-brand-500 focus:border-brand-500"></div>
+        <div><label class="block text-xs text-gray-400 mb-1">名義確認</label><div id="txPayeeName" class="text-sm text-gray-400 py-1">---</div></div>
+      </div>
+    </div>
+    <div class="flex gap-3 mt-6 pt-4 border-t border-gray-100">
+      <button class="bg-brand-500 hover:bg-brand-600 text-white px-5 py-2 rounded-md text-sm transition-colors" onclick="withSubmitGuard(event, () => doTransfer('${lane}'))">送金実行</button>
+      <button class="border border-gray-300 hover:border-gray-400 px-4 py-2 rounded-md text-sm text-gray-600 transition-colors" onclick="lookupName()">名義照会</button>
+    </div>`;
+  loadAccounts('txPayerBank', 'txPayerAcct');
+  document.getElementById('txPayerBank').onchange = () => loadAccounts('txPayerBank', 'txPayerAcct');
+  document.getElementById('txPayeeAcct').onblur = () => lookupName();
+}
+
+async function loadAccounts(bankSelId, acctSelId) {
+  const bankId = document.getElementById(bankSelId).value;
+  const r = await api('GET', `/api/banks/${bankId}/accounts`);
+  const sel = document.getElementById(acctSelId);
+  sel.innerHTML = (r.accounts||[]).filter(a=>a.account_type==='SAVINGS').map(a => `<option value="${a.account_id}">${a.account_id} ${esc(a.customer_name)}</option>`).join('');
+}
+
+async function lookupName() {
+  const acct = document.getElementById('txPayeeAcct').value.trim();
+  if (acct.length !== 10) { document.getElementById('txPayeeName').innerHTML = '<span class="text-amber-500 text-sm">10桁で入力</span>'; return; }
+  try {
+    const r = await api('GET', `/api/accounts/${acct}/name`);
+    document.getElementById('txPayeeName').innerHTML = r.customer_name
+      ? `<span class="text-emerald-600 font-medium">${esc(r.customer_name)}</span> <span class="text-[11px] text-gray-400">(${esc(r.bank_name)})</span>`
+      : '<span class="text-red-500 text-sm">口座が見つかりません</span>';
+  } catch { document.getElementById('txPayeeName').innerHTML = '<span class="text-red-500 text-sm">照会エラー</span>'; }
+}
+
+async function doTransfer(lane) {
+  const payerBank = document.getElementById('txPayerBank').value;
+  const payerAcct = document.getElementById('txPayerAcct').value;
+  const payeeAcct = document.getElementById('txPayeeAcct').value.trim();
+  const amount = parseAmount(document.getElementById('txAmount').value);
+  const purpose = 'P2P';
+  if (!payeeAcct || payeeAcct.length !== 10) { toast('被仕向口座番号は10桁で入力してください', 'error'); return; }
+  if (!amount || amount <= 0) { toast('金額は小数を含まない正しい整数で入力してください', 'error'); return; }
+  const payeeBankId = payeeAcct.slice(0, 3);
+  const txid = 'TX-' + uuid();
+  const body = {
+    schema_version: '1.0', message_type: 'EVENT', name: 'PaymentInitiated',
+    message_id: uuid(), idempotency_key: uuid(), occurred_at: new Date().toISOString(),
+    txid, lane, amount: { value: amount, currency: 'JPY' },
+    payer: { bank_id: payerBank, account_hash: payerAcct },
+    payee: { bank_id: payeeBankId, account_hash: payeeAcct },
+    purpose,
+  };
+  try {
+    const r = await api('POST', '/api/transfers', body);
+    document.getElementById('txResult').innerHTML = card('送金結果', `
+      <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
+        <dt class="text-gray-400">取引ID</dt><dd class="mono">${r.txid||txid}</dd>
+        <dt class="text-gray-400">状態</dt><dd>${badge(r.state||'RECEIVED')}</dd>
+        <dt class="text-gray-400">結果</dt><dd>${r.result||'-'}</dd>
+      </dl>`);
+    toast('送金を受け付けました', 'success');
+    if (lane === 'STANDARD' && r.state === 'RECEIVED') {
+      setTimeout(() => checkAndAuthorize(r.txid || txid), 2000);
+    }
+  } catch(e) { toast('送金エラー: ' + e.message, 'error'); }
+}
+
+async function checkAndAuthorize(txid) {
+  const r = await api('GET', `/api/transactions/${txid}`);
+  if (r.state === 'H_RESERVED') {
+    const auth = await api('POST', `/api/transfers/${txid}/authorize`, { txid, authorized: true, idempotency_key: uuid() });
+    toast('Standard送金: 自動承認完了', 'success');
+  }
+}
+
+// ---------- Bank Management ----------
+async function renderBankMgmt() {
+  const app = document.getElementById('app');
+  app.innerHTML = card('銀行一覧', `
+    <div class="flex gap-3 mb-4 items-end">
+      <div class="flex-1"><label class="block text-xs text-gray-400 mb-1">新規銀行名</label><input type="text" id="newBankName" placeholder="銀行名を入力" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-1 focus:ring-brand-500 focus:border-brand-500"></div>
+      <button class="bg-brand-500 hover:bg-brand-600 text-white px-4 py-2 rounded-md text-sm transition-colors whitespace-nowrap" onclick="addBank()">追加</button>
+    </div>
+    <div class="overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead><tr class="border-b border-gray-200 text-left">
+        <th class="pb-2 text-xs text-gray-400 font-medium">コード</th>
+        <th class="pb-2 text-xs text-gray-400 font-medium">銀行名</th>
+        <th class="pb-2 text-xs text-gray-400 font-medium text-right">H上限</th>
+        <th class="pb-2 text-xs text-gray-400 font-medium text-right">H使用</th>
+        <th class="pb-2 text-xs text-gray-400 font-medium">状態</th>
+        <th class="pb-2 text-xs text-gray-400 font-medium"></th>
+      </tr></thead>
+      <tbody class="divide-y divide-gray-100">${banks.map(b => `<tr id="bankrow-${b.bank_id}" class="hover:bg-gray-50 cursor-pointer" onclick="renderBankDetail('${b.bank_id}')">
+        <td class="py-2 mono">${b.bank_id}</td><td class="py-2">${esc(b.bank_name)}</td>
+        <td class="py-2 text-right">${fmtAmt(b.h_limit)}</td><td class="py-2 text-right">${fmtAmt(b.h_used)}</td>
+        <td class="py-2">${b.is_active ? badge('NORMAL') : badge('CLOSED')}</td>
+        <td class="py-2" onclick="event.stopPropagation()"><button class="text-red-500 hover:text-red-700 text-xs" onclick="deleteBank('${b.bank_id}')">削除</button></td>
+      </tr>`).join('')}</tbody>
+    </table></div>
+  `) + '<div id="bankDetail" class="mt-4"></div>';
+  if (banks.length > 0) renderBankDetail(banks[0].bank_id);
+}
+
+async function renderBankDetail(bankId) {
+  // Highlight selected row
+  document.querySelectorAll('[id^="bankrow-"]').forEach(r => {
+    r.classList.remove('bg-brand-50', 'font-medium');
+  });
+  const selectedRow = document.getElementById('bankrow-' + bankId);
+  if (selectedRow) selectedRow.classList.add('bg-brand-50');
+
+  const detailEl = document.getElementById('bankDetail');
+  if (!detailEl) return;
+  detailEl.innerHTML = '<div class="text-center py-6 text-gray-400 text-sm">読み込み中...</div>';
+
+  const [acctRes, suspRes] = await Promise.all([
+    api('GET', `/bank/${bankId}/v1/teller/accounts`, null, tellerH(bankId)),
+    api('GET', `/bank/${bankId}/v1/teller/suspense`, null, tellerH(bankId)),
+  ]);
+  const accts = acctRes.accounts || [];
+  const susps = suspRes.suspense || [];
+  const bn = bankName(bankId);
+  detailEl.innerHTML = card(`${bn} (${bankId})`, `
+    ${subnav('bd-' + bankId + '-nav', [
+      {key:'accounts', label:'口座'}, {key:'cash', label:'入出金'},
+      {key:'journals', label:'仕訳帳'}, {key:'suspense', label:'別段預金'},
+      {key:'balance', label:'BS'}, {key:'newacct', label:'口座開設'},
+    ])}
+    <div id="bd-${bankId}-tab"></div>
+  `);
+  bindSubnav('bd-' + bankId + '-nav', tab => renderBankTab(bankId, tab, accts, susps));
+  renderBankTab(bankId, 'accounts', accts, susps);
+}
+
+function renderBankTab(bankId, tab, accts, susps) {
+  const el = document.getElementById(`bd-${bankId}-tab`);
+  if (tab === 'accounts') {
+    el.innerHTML = `<div class="overflow-x-auto"><table class="w-full text-sm"><thead><tr class="border-b border-gray-200 text-left">
+      <th class="pb-2 text-xs text-gray-400 font-medium">口座番号</th><th class="pb-2 text-xs text-gray-400 font-medium">名義人</th>
+      <th class="pb-2 text-xs text-gray-400 font-medium">種別</th><th class="pb-2 text-xs text-gray-400 font-medium text-right">残高</th>
+      <th class="pb-2 text-xs text-gray-400 font-medium">状態</th><th class="pb-2 text-xs text-gray-400 font-medium"></th>
+    </tr></thead><tbody class="divide-y divide-gray-100">${accts.filter(a=>a.account_type!=='SUSPENSE').map(a => `<tr class="hover:bg-gray-50">
+      <td class="py-2 mono">${a.account_id}</td><td class="py-2">${esc(a.customer_name)}</td><td class="py-2 text-xs">${a.account_type}</td>
+      <td class="py-2 text-right">${fmtAmt(a.balance)}</td><td class="py-2">${badge(a.status)}</td>
+      <td class="py-2"><button class="text-xs border border-gray-300 rounded px-2 py-1 hover:bg-gray-100" onclick="toggleFreeze('${bankId}','${a.account_id}','${a.status}')">${a.status==='NORMAL'?'凍結':'解除'}</button></td>
+    </tr>`).join('')}</tbody></table></div>`;
+  } else if (tab === 'cash') {
+    el.innerHTML = `<div class="flex gap-3 items-end flex-wrap">
+      <div><label class="block text-xs text-gray-400 mb-1">口座</label><select id="cash-${bankId}-acct" class="border border-gray-300 rounded-md px-3 py-2 text-sm">${accts.filter(a=>a.account_type!=='SUSPENSE').map(a=>`<option value="${a.account_id}">${a.account_id} ${esc(a.customer_name)}</option>`).join('')}</select></div>
+      <div><label class="block text-xs text-gray-400 mb-1">金額</label><input type="number" id="cash-${bankId}-amt" value="100000" min="1" class="border border-gray-300 rounded-md px-3 py-2 text-sm w-32"></div>
+      <button class="bg-brand-500 hover:bg-brand-600 text-white px-4 py-2 rounded-md text-sm" onclick="withSubmitGuard(event, () => doCash('${bankId}','deposit'))">入金</button>
+      <button class="border border-gray-300 hover:border-gray-400 px-4 py-2 rounded-md text-sm" onclick="withSubmitGuard(event, () => doCash('${bankId}','withdrawal'))">出金</button>
+    </div>`;
+  } else if (tab === 'journals') {
+    el.innerHTML = '<div id="jnl-' + bankId + '" class="text-sm text-gray-400">読込中...</div>';
+    loadJournals(bankId);
+  } else if (tab === 'suspense') {
+    el.innerHTML = `<div class="overflow-x-auto"><table class="w-full text-sm"><thead><tr class="border-b border-gray-200 text-left">
+      <th class="pb-2 text-xs text-gray-400 font-medium">ID</th><th class="pb-2 text-xs text-gray-400 font-medium">口座</th>
+      <th class="pb-2 text-xs text-gray-400 font-medium">方向</th><th class="pb-2 text-xs text-gray-400 font-medium text-right">金額</th>
+      <th class="pb-2 text-xs text-gray-400 font-medium">状態</th><th class="pb-2 text-xs text-gray-400 font-medium">取引ID</th>
+      <th class="pb-2 text-xs text-gray-400 font-medium"></th>
+    </tr></thead><tbody class="divide-y divide-gray-100">${susps.map(s => `<tr class="hover:bg-gray-50">
+      <td class="py-2 mono text-[11px]">${s.suspense_id}</td><td class="py-2 mono">${s.account_id}</td><td class="py-2 text-xs">${s.direction}</td>
+      <td class="py-2 text-right">${fmtAmt(s.amount)}</td><td class="py-2">${badge(s.status)}</td>
+      <td class="py-2 mono text-[11px]">${s.txid||'-'}</td>
+      <td class="py-2">${s.status==='CUSTODY'?`<button class="text-xs border border-gray-300 rounded px-2 py-1 hover:bg-gray-100" onclick="resolveSusp('${bankId}','${s.suspense_id}')">収束</button>`:''}</td>
+    </tr>`).join('')}</tbody></table></div>`;
+  } else if (tab === 'balance') {
+    const savings = accts.filter(a => a.account_type === 'SAVINGS' && a.status !== 'CLOSED').reduce((s, a) => s + (a.balance || 0), 0);
+    const current = accts.filter(a => a.account_type === 'CURRENT' && a.status !== 'CLOSED').reduce((s, a) => s + (a.balance || 0), 0);
+    const suspense = accts.filter(a => a.account_type === 'SUSPENSE').reduce((s, a) => s + (a.balance || 0), 0);
+    // ZCS: 負残高 = ZCが当行に支払義務あり = 資産（符号を反転して表示）
+    const zcsRaw  = accts.filter(a => a.account_type === 'SETTLEMENT').reduce((s, a) => s + (a.balance || 0), 0);
+    const zcsAsset = -zcsRaw;
+    // ASSET勘定（現金・預け金）: 負残高 = 銀行の手持ち資産（符号を反転して表示）
+    // 現金入金: Customer(+) / CASH(-) → CASH残高が負 = 銀行に実物資産あり
+    const cashRaw = accts.filter(a => a.account_type === 'ASSET').reduce((s, a) => s + (a.balance || 0), 0);
+    const cashAsset = -cashRaw;
+    // 別段預金は負債側（送金中で当行がまだ支払義務を負う資金）
+    const totalAssets = zcsAsset + cashAsset;
+    const totalLiab   = savings + current + suspense;
+    // ゼロサム: 全勘定（savings + current + suspense + zcsRaw + cashRaw）= 0 が正常
+    const zeroSum = savings + current + suspense + zcsRaw + cashRaw;
+    el.innerHTML = `<div class="grid grid-cols-2 gap-6">
+      <div>
+        <div class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">資産の部</div>
+        <table class="w-full text-sm"><tbody class="divide-y divide-gray-100">
+          <tr>
+            <td class="py-2 text-gray-600">ZC清算勘定（日銀当座相当）
+              <span class="ml-1 text-[10px] text-gray-400">負ZCS残高の符号反転</span>
+            </td>
+            <td class="py-2 text-right font-mono">${fmtAmt(zcsAsset)}</td>
+          </tr>
+          <tr>
+            <td class="py-2 text-gray-600">現金・預け金
+              <span class="ml-1 text-[10px] text-gray-400">負ASSET残高の符号反転</span>
+            </td>
+            <td class="py-2 text-right font-mono">${fmtAmt(cashAsset)}</td>
+          </tr>
+          <tr class="bg-gray-50 font-semibold"><td class="py-2">資産合計</td><td class="py-2 text-right font-mono">${fmtAmt(totalAssets)}</td></tr>
+        </tbody></table>
+      </div>
+      <div>
+        <div class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">負債の部</div>
+        <table class="w-full text-sm"><tbody class="divide-y divide-gray-100">
+          <tr><td class="py-2 text-gray-600">普通預金（SAVINGS）</td><td class="py-2 text-right font-mono">${fmtAmt(savings)}</td></tr>
+          <tr><td class="py-2 text-gray-600">当座預金（CURRENT）</td><td class="py-2 text-right font-mono">${fmtAmt(current)}</td></tr>
+          <tr><td class="py-2 text-gray-600">別段預金（送金中）<span class="ml-1 text-[10px] text-gray-400">中間勘定</span></td><td class="py-2 text-right font-mono">${fmtAmt(suspense)}</td></tr>
+          <tr class="bg-gray-50 font-semibold"><td class="py-2">負債合計</td><td class="py-2 text-right font-mono">${fmtAmt(totalLiab)}</td></tr>
+        </tbody></table>
+      </div>
+    </div>
+    <div class="mt-4 pt-3 border-t border-gray-200">
+      <div class="flex justify-between text-sm mb-1">
+        <span class="text-gray-500">資産合計 − 負債合計（BS均衡チェック）</span>
+        <span class="font-mono ${Math.abs(totalAssets - totalLiab) < 1 ? 'text-emerald-600' : 'text-red-500'}">${fmtAmt(totalAssets - totalLiab)}</span>
+      </div>
+      <div class="flex justify-between text-sm">
+        <span class="text-gray-400 text-xs">全勘定ゼロサム（元帳整合性）</span>
+        <span class="font-mono text-xs ${Math.abs(zeroSum) < 1 ? 'text-emerald-600' : 'text-red-500'}">${fmtAmt(zeroSum)}</span>
+      </div>
+    </div>`;
+  } else if (tab === 'newacct') {
+    el.innerHTML = `<div class="flex gap-3 items-end flex-wrap">
+      <div><label class="block text-xs text-gray-400 mb-1">名義人名</label><input type="text" id="na-${bankId}-name" placeholder="名義人名" class="border border-gray-300 rounded-md px-3 py-2 text-sm"></div>
+      <div><label class="block text-xs text-gray-400 mb-1">種別</label><select id="na-${bankId}-type" class="border border-gray-300 rounded-md px-3 py-2 text-sm"><option>SAVINGS</option><option>CURRENT</option></select></div>
+      <div><label class="block text-xs text-gray-400 mb-1">初期入金額</label><input type="number" id="na-${bankId}-dep" value="1000000" min="0" class="border border-gray-300 rounded-md px-3 py-2 text-sm w-32"></div>
+      <button class="bg-brand-500 hover:bg-brand-600 text-white px-4 py-2 rounded-md text-sm" onclick="withSubmitGuard(event, () => createAcct('${bankId}'))">口座開設</button>
+    </div>`;
+  }
+}
+
+async function loadJournals(bankId) {
+  const r = await api('GET', `/bank/${bankId}/v1/teller/journals?limit=100`, null, tellerH(bankId));
+  const el = document.getElementById('jnl-' + bankId);
+  if (!el) return;
+  const jnls = r.journals || [];
+  if (jnls.length === 0) { el.innerHTML = '<p class="text-gray-400 text-sm py-4">仕訳データなし</p>'; return; }
+
+  // Group by txid — entries sharing the same txid form one compound journal entry
+  const keys = [], byKey = {};
+  for (const j of jnls) {
+    const k = j.txid || ('__' + j.journal_id);
+    if (!byKey[k]) { byKey[k] = []; keys.push(k); }
+    byKey[k].push(j);
+  }
+
+  // Render paired Dr/Cr ledger rows (Dr = amount < 0 / asset-side; Cr = amount >= 0 / liability-side)
+  const rows = keys.flatMap(k => {
+    const entries = byKey[k];
+    const dr = entries.filter(j => j.amount < 0);
+    const cr = entries.filter(j => j.amount >= 0);
+    const n = Math.max(dr.length, cr.length, 1);
+    const date = entries[0]?.value_date || '-';
+    const txid = entries[0]?.txid ? entries[0].txid.slice(0, 16) : '-';
+    const desc = entries[0]?.description || entries[0]?.tx_type || '-';
+    return Array.from({ length: n }, (_, i) => {
+      const d = dr[i], c = cr[i];
+      return `<tr class="border-b border-gray-100 hover:bg-gray-50">
+        ${i === 0 ? `<td class="py-2 pr-3 text-[11px] text-gray-400 align-top whitespace-nowrap" rowspan="${n}">${date}</td>` : ''}
+        <td class="py-1.5 mono text-[11px] text-red-700 align-top pr-1">${d ? d.account_id : ''}</td>
+        <td class="py-1.5 text-right text-[12px] font-medium text-red-600 align-top pr-3 whitespace-nowrap">${d ? fmtAmt(Math.abs(d.amount)) : ''}</td>
+        <td class="py-1.5 text-center text-gray-300 align-top select-none">|</td>
+        <td class="py-1.5 mono text-[11px] text-emerald-700 align-top pl-3 pr-1">${c ? c.account_id : ''}</td>
+        <td class="py-1.5 text-right text-[12px] font-medium text-emerald-600 align-top pr-3 whitespace-nowrap">${c ? fmtAmt(c.amount) : ''}</td>
+        ${i === 0 ? `<td class="py-2 text-[11px] text-gray-500 align-top pl-2" rowspan="${n}">${desc}</td>
+        <td class="py-2 mono text-[11px] text-gray-300 align-top pl-2 whitespace-nowrap" rowspan="${n}">${txid}</td>` : ''}
+      </tr>`;
+    });
+  }).join('');
+
+  el.innerHTML = `<div class="overflow-x-auto">
+    <table class="w-full text-sm border-collapse">
+      <thead>
+        <tr>
+          <th class="pb-1 text-xs text-gray-400 font-medium text-left whitespace-nowrap" rowspan="2" style="min-width:72px">日付</th>
+          <th class="pb-1 text-xs text-red-400 font-semibold text-center" colspan="2">借方 Dr</th>
+          <th class="pb-1 text-gray-200 text-center" rowspan="2"></th>
+          <th class="pb-1 text-xs text-emerald-500 font-semibold text-center" colspan="2">貸方 Cr</th>
+          <th class="pb-1 text-xs text-gray-400 font-medium text-left" rowspan="2">摘要</th>
+          <th class="pb-1 text-xs text-gray-400 font-medium text-left" rowspan="2">取引ID</th>
+        </tr>
+        <tr class="border-b border-gray-200">
+          <th class="pb-2 text-xs text-gray-400 font-normal text-left">口座</th>
+          <th class="pb-2 text-xs text-gray-400 font-normal text-right pr-3">金額</th>
+          <th class="pb-2 text-xs text-gray-400 font-normal text-left pl-3">口座</th>
+          <th class="pb-2 text-xs text-gray-400 font-normal text-right pr-3">金額</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+  </div>`;
+}
+
+async function addBank() {
+  const name = document.getElementById('newBankName').value.trim();
+  if (!name) { toast('銀行名を入力してください', 'error'); return; }
+  const r = await api('POST', '/api/banks/add', { bank_name: name });
+  toast(`${name} (${r.bank_id}) を追加しました`, 'success');
+  renderPage('bank');
+}
+async function deleteBank(bankId) {
+  if (!confirm(`銀行 ${bankId} を削除しますか？`)) return;
+  const r = await api('DELETE', `/api/banks/${bankId}`);
+  if (r.error) { toast(r.error, 'error'); return; }
+  toast(`銀行 ${bankId} を削除しました`, 'success');
+  renderPage('bank');
+}
+async function doCash(bankId, type) {
+  const acct = document.getElementById(`cash-${bankId}-acct`).value;
+  const amount = parseAmount(document.getElementById(`cash-${bankId}-amt`).value);
+  if (!amount || amount <= 0) { toast('金額は小数を含まない正しい整数で入力してください', 'error'); return; }
+  const r = await api('POST', `/bank/${bankId}/v1/teller/cash/${type}`, { account_id: acct, amount }, tellerH(bankId));
+  if (r.error) { toast(r.error, 'error'); return; }
+  toast(`${type==='deposit'?'入金':'出金'}完了: 残高 ${fmtAmt(r.new_balance)}`, 'success');
+  renderPage('bank');
+}
+async function toggleFreeze(bankId, acctId, currentStatus) {
+  const newStatus = currentStatus === 'NORMAL' ? 'FROZEN' : 'NORMAL';
+  await api('PATCH', `/bank/${bankId}/v1/teller/accounts/${acctId}/status`, { status: newStatus, reason: '管理者操作' }, tellerH(bankId));
+  toast(`口座 ${acctId} を ${newStatus} に変更`, 'success');
+  renderPage('bank');
+}
+async function createAcct(bankId) {
+  const name = document.getElementById(`na-${bankId}-name`).value.trim();
+  if (!name) { toast('名義人名を入力してください', 'error'); return; }
+  const type = document.getElementById(`na-${bankId}-type`).value;
+  const depRaw = document.getElementById(`na-${bankId}-dep`).value.trim();
+  const dep = depRaw ? parseAmount(depRaw) : 0;
+  if (Number.isNaN(dep)) { toast('初期入金額は小数を含まない正しい整数で入力してください', 'error'); return; }
+  const r = await api('POST', `/bank/${bankId}/v1/teller/accounts`, { customer_name: name, account_type: type, initial_deposit: dep }, tellerH(bankId));
+  if (r.error) { toast(r.error, 'error'); return; }
+  toast(`口座 ${r.account_id} を開設しました`, 'success');
+  renderPage('bank');
+}
+async function resolveSusp(bankId, suspId) {
+  await api('POST', `/bank/${bankId}/v1/teller/suspense/${suspId}/resolve`, { action: 'SETTLE' }, tellerH(bankId));
+  toast(`別段預金 ${suspId} を収束しました`, 'success');
+  renderPage('bank');
+}
+
+// ---------- HTLC ----------
+async function renderHtlc() {
+  const app = document.getElementById('app');
+  app.innerHTML = card('HTLC 条件付き送金', `
+    <p class="text-xs text-gray-400 mb-4">ハッシュロック＋タイムロックによる条件付き口座間送金。ハッシュは自動生成されます。</p>
+    ${subnav('htlcNav', [
+      {key:'create', label:'作成'}, {key:'claim', label:'受取 (Claim)'}, {key:'list', label:'一覧'},
+    ])}
+    <div id="htlcTab"></div>
+  `) + '<div id="htlcResult"></div>';
+  bindSubnav('htlcNav', renderHtlcTab);
+  renderHtlcTab('create');
+}
+
+function renderHtlcTab(tab) {
+  const bankOpts = banks.map(b => `<option value="${b.bank_id}">${esc(b.bank_name)} (${b.bank_id})</option>`).join('');
+  const el = document.getElementById('htlcTab');
+  if (tab === 'create') {
+    const future = new Date(Date.now() + 3600000).toISOString().slice(0, 16);
+    el.innerHTML = `
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div class="space-y-3">
+        <h4 class="text-xs font-medium text-gray-500 uppercase tracking-wider">支払人（Payer）</h4>
+        <div><label class="block text-xs text-gray-400 mb-1">銀行</label><select id="htlcPayerBank" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-1 focus:ring-brand-500 focus:border-brand-500">${bankOpts}</select></div>
+        <div><label class="block text-xs text-gray-400 mb-1">口座</label><select id="htlcPayerAcct" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-1 focus:ring-brand-500 focus:border-brand-500"><option>読込中...</option></select></div>
+      </div>
+      <div class="space-y-3">
+        <h4 class="text-xs font-medium text-gray-500 uppercase tracking-wider">受取人（Payee）</h4>
+        <div><label class="block text-xs text-gray-400 mb-1">口座番号（10桁）</label><input type="text" id="htlcPayeeAcct" placeholder="例: 0020000001" maxlength="10" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm font-mono focus:ring-1 focus:ring-brand-500 focus:border-brand-500"></div>
+        <div><label class="block text-xs text-gray-400 mb-1">名義確認</label><div id="htlcPayeeName" class="text-sm text-gray-400 py-1">---</div></div>
+      </div>
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+      <div><label class="block text-xs text-gray-400 mb-1">金額 (円)</label><input type="number" id="htlcAmt" value="50000" min="1" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"></div>
+      <div><label class="block text-xs text-gray-400 mb-1">期限（Timelock）</label><input type="datetime-local" id="htlcTimelock" value="${future}" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"></div>
+    </div>
+    <div class="mt-6 pt-4 border-t border-gray-100">
+      <button class="bg-brand-500 hover:bg-brand-600 text-white px-5 py-2 rounded-md text-sm transition-colors" onclick="withSubmitGuard(event, () => createHtlc())">HTLC作成</button>
+    </div>`;
+    loadAccounts('htlcPayerBank', 'htlcPayerAcct');
+    document.getElementById('htlcPayerBank').onchange = () => loadAccounts('htlcPayerBank', 'htlcPayerAcct');
+    document.getElementById('htlcPayeeAcct').onblur = () => htlcLookupName();
+  } else if (tab === 'claim') {
+    el.innerHTML = `<div class="space-y-3 max-w-lg">
+      <div><label class="block text-xs text-gray-400 mb-1">HTLC ID</label><input type="text" id="claimHtlcId" placeholder="HTLC-..." class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm font-mono"></div>
+      <div><label class="block text-xs text-gray-400 mb-1">プリイメージ</label><input type="text" id="claimPreimage" placeholder="64文字の16進数" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm font-mono"></div>
+      <button class="bg-brand-500 hover:bg-brand-600 text-white px-5 py-2 rounded-md text-sm transition-colors" onclick="claimHtlc()">受取実行 (Claim)</button>
+    </div>`;
+  } else {
+    el.innerHTML = '<div id="htlcList" class="text-sm text-gray-400">読込中...</div>';
+    loadHtlcList();
+  }
+}
+
+async function htlcLookupName() {
+  const acct = document.getElementById('htlcPayeeAcct').value.trim();
+  if (acct.length !== 10) { document.getElementById('htlcPayeeName').innerHTML = '<span class="text-amber-500 text-sm">10桁必須</span>'; return; }
+  try {
+    const r = await api('GET', `/api/accounts/${acct}/name`);
+    document.getElementById('htlcPayeeName').innerHTML = r.customer_name
+      ? `<span class="text-emerald-600 font-medium">${esc(r.customer_name)}</span> <span class="text-[11px] text-gray-400">(${esc(r.bank_name)})</span>`
+      : '<span class="text-red-500 text-sm">口座が見つかりません</span>';
+  } catch { document.getElementById('htlcPayeeName').innerHTML = '<span class="text-red-500 text-sm">照会エラー</span>'; }
+}
+
+async function createHtlc() {
+  const payerAcct = document.getElementById('htlcPayerAcct').value;
+  const payeeAcct = document.getElementById('htlcPayeeAcct').value.trim();
+  if (!payerAcct) { toast('支払口座を選択してください', 'error'); return; }
+  if (!payeeAcct || payeeAcct.length !== 10) { toast('受取口座番号は10桁で入力してください', 'error'); return; }
+  const htlcAmt = parseAmount(document.getElementById('htlcAmt').value);
+  if (!htlcAmt || htlcAmt <= 0) { toast('金額は小数を含まない正しい整数で入力してください', 'error'); return; }
+  const payerBankId = payerAcct.slice(0, 3);
+  const payeeBankId = payeeAcct.slice(0, 3);
+  const htlcId = 'HTLC-' + uuid().slice(0,8);
+  const body = {
+    htlc_id: htlcId, hashlock: '', timelock: new Date(document.getElementById('htlcTimelock').value + 'Z').toISOString(),
+    amount: { value: htlcAmt, currency: 'JPY' },
+    payer_bank_id: payerBankId, payer_account_hash: payerAcct,
+    payee_bank_id: payeeBankId, payee_account_hash: payeeAcct,
+    idempotency_key: uuid(),
+  };
+  const r = await api('POST', '/api/htlc/create', body);
+  if (r.error || r.reason_code) {
+    toast('HTLC作成エラー: ' + (r.error || r.reason_code), 'error');
+    return;
+  }
+  document.getElementById('htlcResult').innerHTML = card('HTLC作成結果', `
+    <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
+      <dt class="text-gray-400">HTLC ID</dt><dd class="mono">${r.htlc_id}</dd>
+      <dt class="text-gray-400">状態</dt><dd>${badge(r.state||'')}</dd>
+      <dt class="text-gray-400">ハッシュロック</dt><dd class="mono text-[11px] break-all">${r.hashlock||'-'}</dd>
+      <dt class="text-brand-600 font-medium">プリイメージ（受取人に伝達）</dt>
+      <dd class="mono text-[11px] break-all bg-amber-50 border border-amber-200 rounded px-3 py-2">${r.preimage||'（ユーザー指定のハッシュを使用）'}</dd>
+    </dl>`);
+  toast('HTLC作成完了', 'success');
+}
+
+async function claimHtlc() {
+  const htlcId = document.getElementById('claimHtlcId').value.trim();
+  const preimage = document.getElementById('claimPreimage').value.trim();
+  if (!htlcId || !preimage) { toast('HTLC IDとプリイメージを入力してください', 'error'); return; }
+  const r = await api('POST', `/api/htlc/${htlcId}/claim`, { htlc_id: htlcId, preimage, idempotency_key: uuid() });
+  document.getElementById('htlcResult').innerHTML = card('Claim結果', `
+    <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
+      <dt class="text-gray-400">HTLC ID</dt><dd>${r.htlc_id}</dd>
+      <dt class="text-gray-400">結果</dt><dd>${badge(r.result)}</dd>
+      <dt class="text-gray-400">状態</dt><dd>${badge(r.state)}</dd>
+      ${r.reason_code ? `<dt class="text-gray-400">理由</dt><dd class="text-red-600">${r.reason_code}</dd>` : ''}
+    </dl>`);
+  toast(r.result === 'ACCEPTED' ? 'Claim成功' : 'Claim失敗: ' + (r.reason_code||''), r.result === 'ACCEPTED' ? 'success' : 'error');
+}
+
+async function loadHtlcList() {
+  const res = await api('GET', '/api/htlc?limit=50');
+  const htlcs = res.htlcs || [];
+  const el = document.getElementById('htlcList');
+  if (!el) return;
+  if (htlcs.length === 0) { el.innerHTML = '<p class="text-gray-400 py-4">HTLCトランザクションはありません</p>'; return; }
+  el.innerHTML = `<div class="overflow-x-auto"><table class="w-full text-sm"><thead><tr class="border-b border-gray-200 text-left">
+    <th class="pb-2 text-xs text-gray-400 font-medium">HTLC ID</th>
+    <th class="pb-2 text-xs text-gray-400 font-medium text-right">金額</th>
+    <th class="pb-2 text-xs text-gray-400 font-medium">仕向銀行</th>
+    <th class="pb-2 text-xs text-gray-400 font-medium">被仕向銀行</th>
+    <th class="pb-2 text-xs text-gray-400 font-medium">HTLC状態</th>
+    <th class="pb-2 text-xs text-gray-400 font-medium">決済状態</th>
+    <th class="pb-2 text-xs text-gray-400 font-medium">Claim</th>
+    <th class="pb-2 text-xs text-gray-400 font-medium">期限</th>
+    <th class="pb-2 text-xs text-gray-400 font-medium">作成日時</th>
+  </tr></thead><tbody class="divide-y divide-gray-100">${htlcs.map(h => `<tr class="hover:bg-gray-50">
+    <td class="py-2 mono text-[11px]">${h.htlc_id}</td>
+    <td class="py-2 text-right">${fmtAmt(h.amount_value)}</td>
+    <td class="py-2 text-[11px]">${bankName(h.payer_bank_id)}</td>
+    <td class="py-2 text-[11px]">${bankName(h.payee_bank_id)}</td>
+    <td class="py-2">${badge(h.state)}</td>
+    <td class="py-2">${h.tx_state ? badge(h.tx_state) : '<span class="text-gray-300">-</span>'}</td>
+    <td class="py-2 text-center">${h.secret_verified ? '<span class="text-emerald-600 text-xs font-medium">OK</span>' : '<span class="text-gray-300 text-xs">-</span>'}</td>
+    <td class="py-2 text-[11px] text-gray-400">${fmtDate(h.timelock)}</td>
+    <td class="py-2 text-[11px] text-gray-400">${fmtDate(h.created_at)}</td>
+  </tr>`).join('')}</tbody></table></div>`;
+}
+
+// ---------- GTID ----------
+let gtidLegs = [
+  { role: 'PAYER', account: '', amount: '30000' },
+  { role: 'PAYEE', account: '', amount: '30000' },
+];
+
+async function renderGtid() {
+  const app = document.getElementById('app');
+  app.innerHTML = card('GTID 協調送金', `
+    <p class="text-xs text-gray-400 mb-4">複数レグの原子的決済。全レグがOKの場合のみ実行されます。PAYER合計 = PAYEE合計 である必要があります。</p>
+    <div id="gtidLegsContainer"></div>
+    <div class="flex items-center gap-3 mt-3">
+      <button class="border border-dashed border-gray-300 hover:border-brand-500 text-gray-500 hover:text-brand-500 px-4 py-1.5 rounded-md text-sm transition-colors" onclick="addGtidLeg()">+ レグ追加</button>
+      <div id="gtidBalance" class="text-xs"></div>
+    </div>
+    <div class="mt-6 pt-4 border-t border-gray-100">
+      <button class="bg-brand-500 hover:bg-brand-600 text-white px-5 py-2 rounded-md text-sm transition-colors" onclick="withSubmitGuard(event, () => doGtid())">GTID送金実行</button>
+    </div>
+  `) + '<div id="gtidResult"></div>' + card('GTID取引一覧', '<div id="gtidList" class="text-sm text-gray-400">読込中...</div>');
+  renderGtidLegs();
+  loadGtidList();
+}
+
+function renderGtidLegs() {
+  const el = document.getElementById('gtidLegsContainer');
+  if (!el) return;
+  el.innerHTML = gtidLegs.map((leg, i) => `
+    <div class="mb-2 p-3 rounded-lg bg-gray-50 border border-gray-200 fade-in">
+      <div class="flex items-center gap-2 mb-2">
+        <span class="text-xs text-gray-400 font-medium w-6">#${i+1}</span>
+        <select onchange="updateGtidLeg(${i},'role',this.value)" class="border border-gray-300 rounded-md px-3 py-2 text-sm ${leg.role==='PAYER'?'bg-red-50 text-red-700':'bg-emerald-50 text-emerald-700'} font-medium">
+          <option value="PAYER" ${leg.role==='PAYER'?'selected':''}>PAYER（支払）</option>
+          <option value="PAYEE" ${leg.role==='PAYEE'?'selected':''}>PAYEE（受取）</option>
+        </select>
+        <button onclick="removeGtidLeg(${i})" class="ml-auto text-red-400 hover:text-red-600 text-lg" title="削除">&times;</button>
+      </div>
+      <div class="grid grid-cols-[1fr_auto_auto] gap-3 items-end">
+        <div>
+          <label class="block text-xs text-gray-400 mb-1">口座番号（10桁）</label>
+          <div class="flex items-center gap-2">
+            <input type="text" value="${leg.account}" maxlength="10" placeholder="例: 0010000001"
+              onchange="updateGtidLeg(${i},'account',this.value)" onblur="gtidLookupName(${i},this.value)"
+              class="w-40 border border-gray-300 rounded-md px-3 py-2 text-sm font-mono">
+            <span id="gtidLegName${i}" class="text-xs text-gray-500"></span>
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs text-gray-400 mb-1">金額（円）</label>
+          <input type="number" value="${leg.amount}" min="1"
+            onchange="updateGtidLeg(${i},'amount',this.value)"
+            class="border border-gray-300 rounded-md px-3 py-2 text-sm w-32">
+        </div>
+      </div>
+    </div>
+  `).join('');
+  updateGtidBalance();
+}
+
+function updateGtidLeg(i, field, value) { gtidLegs[i][field] = value; updateGtidBalance(); }
+function addGtidLeg() { gtidLegs.push({ role: 'PAYEE', account: '', amount: '0' }); renderGtidLegs(); }
+function removeGtidLeg(i) { if (gtidLegs.length <= 2) { toast('最低2レグ必要です', 'error'); return; } gtidLegs.splice(i, 1); renderGtidLegs(); }
+
+async function gtidLookupName(i, acct) {
+  const el = document.getElementById('gtidLegName' + i);
+  if (!el) return;
+  if (acct.length !== 10) { el.innerHTML = '<span class="text-amber-500">10桁必須</span>'; return; }
+  try {
+    const r = await api('GET', `/api/accounts/${acct}/name`);
+    el.innerHTML = r.customer_name ? `<span class="text-emerald-600">${esc(r.customer_name)}</span>` : '<span class="text-red-400">不明</span>';
+  } catch { el.innerHTML = '<span class="text-red-400">エラー</span>'; }
+}
+
+function updateGtidBalance() {
+  const el = document.getElementById('gtidBalance');
+  if (!el) return;
+  const payerTotal = gtidLegs.filter(l=>l.role==='PAYER').reduce((s,l)=>s+parseAmount(l.amount||'0'),0);
+  const payeeTotal = gtidLegs.filter(l=>l.role==='PAYEE').reduce((s,l)=>s+parseAmount(l.amount||'0'),0);
+  const ok = payerTotal > 0 && payerTotal === payeeTotal;
+  el.innerHTML = `
+    <span class="text-gray-500">PAYER合計:</span> <span class="font-medium">${fmtAmt(payerTotal)}</span>
+    <span class="mx-2 text-gray-300">|</span>
+    <span class="text-gray-500">PAYEE合計:</span> <span class="font-medium">${fmtAmt(payeeTotal)}</span>
+    <span class="mx-2 text-gray-300">|</span>
+    ${ok ? '<span class="text-emerald-600 font-medium">Balance OK</span>' : '<span class="text-red-500 font-medium">Balance NG</span>'}
+  `;
+}
+
+async function doGtid() {
+  // Validation
+  const payerLegs = gtidLegs.filter(l => l.role === 'PAYER');
+  const payeeLegs = gtidLegs.filter(l => l.role === 'PAYEE');
+  if (payerLegs.length === 0 || payeeLegs.length === 0) { toast('PAYERとPAYEEが各1つ以上必要です', 'error'); return; }
+  for (const leg of gtidLegs) {
+    if (!leg.account || leg.account.length !== 10) { toast('全レグの口座番号を10桁で入力してください', 'error'); return; }
+    if (!parseAmount(leg.amount) || parseAmount(leg.amount) <= 0) { toast('全レグの金額は小数を含まない正しい整数で入力してください', 'error'); return; }
+  }
+  const payerTotal = payerLegs.reduce((s,l) => s + parseAmount(l.amount), 0);
+  const payeeTotal = payeeLegs.reduce((s,l) => s + parseAmount(l.amount), 0);
+  if (payerTotal !== payeeTotal) { toast(`PAYER合計(${fmtAmt(payerTotal)})とPAYEE合計(${fmtAmt(payeeTotal)})が一致しません`, 'error'); return; }
+
+  const gtid = 'GT-' + uuid().slice(0, 8);
+  const legs = gtidLegs.map(leg => ({
+    leg_id: `LEG-${leg.role[0]}-${uuid().slice(0,6)}`,
+    role: leg.role,
+    bank_id: leg.account.slice(0, 3),
+    account_hash: leg.account,
+    amount: { value: parseAmount(leg.amount), currency: 'JPY' },
+  }));
+  const body = { gtid, legs, idempotency_key: uuid() };
+  const r = await api('POST', '/api/gtid/register', body);
+  document.getElementById('gtidResult').innerHTML = card('GTID結果', `
+    <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
+      <dt class="text-gray-400">GTID</dt><dd class="mono">${r.gtid}</dd>
+      <dt class="text-gray-400">状態</dt><dd>${badge(r.state)}</dd>
+      <dt class="text-gray-400">レグ数</dt><dd>${legs.length}</dd>
+    </dl>`);
+  toast('GTID登録完了', 'success');
+  // Reset legs
+  gtidLegs = [
+    { role: 'PAYER', account: '', amount: '30000' },
+    { role: 'PAYEE', account: '', amount: '30000' },
+  ];
+  setTimeout(() => loadGtidList(), 2000);
+}
+
+async function loadGtidList() {
+  const el = document.getElementById('gtidList');
+  if (!el) return;
+  const r = await api('GET', '/api/gtid?limit=20');
+  const gtids = r.gtids || [];
+  if (gtids.length === 0) { el.innerHTML = '<p class="text-gray-400 py-4">GTID取引はありません</p>'; return; }
+  el.innerHTML = `<div class="overflow-x-auto"><table class="w-full text-sm"><thead><tr class="border-b border-gray-200 text-left">
+    <th class="pb-2 text-xs text-gray-400 font-medium">GTID</th>
+    <th class="pb-2 text-xs text-gray-400 font-medium">状態</th>
+    <th class="pb-2 text-xs text-gray-400 font-medium text-right">合計金額</th>
+    <th class="pb-2 text-xs text-gray-400 font-medium text-center">レグ数</th>
+    <th class="pb-2 text-xs text-gray-400 font-medium text-center">Ready</th>
+    <th class="pb-2 text-xs text-gray-400 font-medium text-center">Settled</th>
+    <th class="pb-2 text-xs text-gray-400 font-medium">日時</th>
+    <th class="pb-2 text-xs text-gray-400 font-medium"></th>
+  </tr></thead><tbody class="divide-y divide-gray-100">${gtids.map(g => `<tr class="hover:bg-gray-50">
+    <td class="py-2 mono text-[11px]">${g.gtid}</td>
+    <td class="py-2">${badge(g.state)}</td>
+    <td class="py-2 text-right">${fmtAmt(g.total_amount)}</td>
+    <td class="py-2 text-center">${g.leg_count}</td>
+    <td class="py-2 text-center">${g.legs_ready_count}/${g.leg_count}</td>
+    <td class="py-2 text-center">${g.legs_settled_count}/${g.leg_count}</td>
+    <td class="py-2 text-[11px] text-gray-400">${fmtDate(g.created_at)}</td>
+    <td class="py-2"><button class="text-xs text-brand-500 hover:text-brand-700" onclick="showGtidDetail('${g.gtid}')">詳細</button></td>
+  </tr><tr id="gtid-detail-${g.gtid}" class="hidden"><td colspan="8"></td></tr>`).join('')}</tbody></table></div>`;
+}
+
+async function showGtidDetail(gtid) {
+  const row = document.getElementById('gtid-detail-' + gtid);
+  if (!row) return;
+  if (!row.classList.contains('hidden')) { row.classList.add('hidden'); return; }
+  const r = await api('GET', `/api/gtid/${gtid}`);
+  const legs = r.legs || [];
+  row.classList.remove('hidden');
+  row.querySelector('td').innerHTML = `
+    <div class="p-4 bg-gray-50 rounded-lg my-2 fade-in">
+      <div class="flex items-center justify-between mb-2">
+        <h4 class="text-xs font-medium text-gray-500">レグ詳細</h4>
+        <button class="text-xs text-brand-500 hover:text-brand-700 underline" onclick="showGtidTimeline('${gtid}')">GTIDイベント</button>
+      </div>
+      <table class="w-full text-sm"><thead><tr class="border-b border-gray-200 text-left">
+        <th class="pb-1 text-xs text-gray-400">Leg ID</th><th class="pb-1 text-xs text-gray-400">ロール</th>
+        <th class="pb-1 text-xs text-gray-400">銀行</th><th class="pb-1 text-xs text-gray-400">口座</th>
+        <th class="pb-1 text-xs text-gray-400 text-right">金額</th><th class="pb-1 text-xs text-gray-400">状態</th>
+        <th class="pb-1 text-xs text-gray-400">取引ID</th>
+      </tr></thead><tbody class="divide-y divide-gray-100">${legs.map(l => `<tr class="hover:bg-amber-50 ${l.txid ? 'cursor-pointer' : ''}" ${l.txid ? `onclick="showTxTimeline('${l.txid}')"` : ''}>
+        <td class="py-1.5 mono text-[11px]">${l.leg_id.slice(0,12)}…</td>
+        <td class="py-1.5"><span class="${l.role==='PAYER'?'text-red-500':'text-emerald-500'} text-xs font-medium">${l.role}</span></td>
+        <td class="py-1.5 text-xs">${bankName(l.bank_id)}</td>
+        <td class="py-1.5 mono text-[11px]">${l.account_hash}</td>
+        <td class="py-1.5 text-right">${fmtAmt(l.amount_value)}</td>
+        <td class="py-1.5">${badge(l.state)}</td>
+        <td class="py-1.5 mono text-[11px] text-blue-500">${l.txid ? l.txid.slice(0,18)+'…' : '-'}</td>
+      </tr>`).join('')}</tbody></table>
+      <p class="text-[10px] text-gray-400 mt-2">レグ行をクリックすると個別取引タイムラインを表示</p>
+    </div>`;
+}
+
+// GTID レベルのイベントタイムラインを txModal に表示
+async function showGtidTimeline(gtid) {
+  const modal = document.getElementById('txModal');
+  const modalId = document.getElementById('txModalId');
+  const modalMeta = document.getElementById('txModalMeta');
+  const timeline = document.getElementById('txModalTimeline');
+  if (!modal) return;
+  modalId.textContent = gtid;
+  modalMeta.innerHTML = '<div class="text-gray-300 text-xs col-span-4">読み込み中...</div>';
+  timeline.innerHTML = '<div class="text-gray-400 text-sm py-4 text-center">イベントを取得中...</div>';
+  modal.classList.remove('hidden');
+  try {
+    const [gtRes, evRes] = await Promise.all([
+      api('GET', `/api/gtid/${gtid}`),
+      api('GET', `/api/gtid/${gtid}/events`),
+    ]);
+    const gt = gtRes || {};
+    const events = evRes.events || [];
+    modalMeta.innerHTML = `
+      <div><div class="text-[10px] text-gray-400 uppercase tracking-wider">状態</div><div class="mt-1">${badge(gt.state || '-')}</div></div>
+      <div><div class="text-[10px] text-gray-400 uppercase tracking-wider">総額</div><div class="mt-1 text-sm font-medium">${gt.total_amount ? fmtAmt(gt.total_amount) : '-'}</div></div>
+      <div><div class="text-[10px] text-gray-400 uppercase tracking-wider">レグ数</div><div class="mt-1 text-sm font-medium">${gt.leg_count || '-'}</div></div>
+      <div><div class="text-[10px] text-gray-400 uppercase tracking-wider">作成日時</div><div class="mt-1 text-[11px] text-gray-600">${fmtDate(gt.created_at)}</div></div>
+    `;
+    if (!events.length) {
+      timeline.innerHTML = '<div class="text-gray-400 text-sm py-8 text-center">イベントログがありません</div>';
+    } else {
+      const statusIcon = s => s === 'OK' ? '<i class="fa-solid fa-check"></i>' : s === 'FAILED' ? '<i class="fa-solid fa-xmark"></i>' : '<i class="fa-solid fa-circle text-[8px]"></i>';
+      const statusCls  = s => s === 'OK' ? 'text-emerald-600 bg-emerald-50 border-emerald-200' : s === 'FAILED' ? 'text-red-600 bg-red-50 border-red-200' : 'text-amber-600 bg-amber-50 border-amber-200';
+      timeline.innerHTML = events.map((ev, i) => `
+        <div class="flex gap-3 fade-in" style="animation-delay:${i*30}ms">
+          <div class="flex flex-col items-center flex-shrink-0">
+            <div class="w-7 h-7 rounded-full border-2 flex items-center justify-center text-sm font-bold ${statusCls(ev.status)}">${statusIcon(ev.status)}</div>
+            ${i < events.length-1 ? '<div class="w-0.5 flex-1 bg-gray-200 mt-1"></div>' : ''}
+          </div>
+          <div class="flex-1 pb-4">
+            <div class="flex items-start justify-between gap-2">
+              <div>
+                <span class="text-sm font-medium text-gray-800">${ev.action || '-'}</span>
+                <span class="ml-1 text-[9px] text-blue-500 bg-blue-50 border border-blue-100 rounded px-1 py-0.5">状態遷移</span>
+              </div>
+              <div class="text-[11px] text-gray-400">${fmtDate(ev.created_at)}</div>
+            </div>
+            ${ev.state_to ? `<div class="mt-0.5 flex items-center gap-1 text-[11px]">
+              ${ev.state_from ? `<span class="text-gray-400 font-mono">${ev.state_from}</span><span class="text-gray-300 mx-0.5">→</span>` : ''}
+              <span class="font-semibold font-mono text-brand-600">${ev.state_to}</span>
+            </div>` : ''}
+          </div>
+        </div>
+      `).join('');
+    }
+  } catch(e) {
+    timeline.innerHTML = `<div class="text-red-500 text-sm py-4">取得エラー: ${e.message}</div>`;
+  }
+}
+
+// ---------- DNS ----------
+async function renderDns() {
+  const today = new Date().toISOString().slice(0, 10);
+  const [statusRes, posRes] = await Promise.all([
+    api('GET', `/api/dns/${today}/status`),
+    api('GET', `/api/dns/${today}/position`),
+  ]);
+  const positions = posRes.positions || [];
+  document.getElementById('app').innerHTML = card(`DNS清算 (${today})`, `
+    <div class="grid grid-cols-3 gap-4 mb-6">
+      <div class="bg-gray-50 rounded-lg p-4 text-center">
+        <div class="text-lg">${badge(statusRes.state||'NOT_STARTED')}</div>
+        <div class="text-[11px] text-gray-400 mt-1">サイクル状態</div>
+      </div>
+      <div class="bg-gray-50 rounded-lg p-4 text-center">
+        <div class="text-sm font-medium text-gray-700">${statusRes.igs_mode||'N/A'}</div>
+        <div class="text-[11px] text-gray-400 mt-1">IGSモード</div>
+      </div>
+      <div class="bg-gray-50 rounded-lg p-4 text-center">
+        <div class="mono text-sm">${statusRes.cycle_id||'---'}</div>
+        <div class="text-[11px] text-gray-400 mt-1">サイクルID</div>
+      </div>
+    </div>
+    <div class="flex gap-3 mb-6">
+      <button class="bg-brand-500 hover:bg-brand-600 text-white px-4 py-2 rounded-md text-sm transition-colors" onclick="dnsKick()">DNS Kick</button>
+      <button class="border border-gray-300 hover:border-gray-400 px-4 py-2 rounded-md text-sm transition-colors" onclick="dnsSettle('${statusRes.cycle_id||''}')">DNS Settle</button>
+    </div>
+    ${positions.length > 0 ? `
+    <h4 class="text-xs font-medium text-gray-500 mb-2">ネットポジション</h4>
+    <div class="overflow-x-auto"><table class="w-full text-sm"><thead><tr class="border-b border-gray-200">
+      <th class="pb-2 text-xs text-gray-400 font-medium text-left">銀行</th>
+      <th class="pb-2 text-xs text-gray-400 font-medium text-right">ネットポジション</th>
+      <th class="pb-2 text-xs text-gray-400 font-medium text-center">状態</th>
+    </tr></thead><tbody class="divide-y divide-gray-100">${positions.map(p => {
+      const settled = p.is_settled === 1 || p.is_settled === true;
+      const amtCls = settled ? 'text-gray-400 line-through' : (p.net_position>=0?'text-emerald-600':'text-red-600');
+      return `<tr class="${settled?'bg-gray-50 opacity-70':'hover:bg-gray-50'}">
+        <td class="py-2 ${settled?'text-gray-400':''}">${bankName(p.bank_id)}</td>
+        <td class="py-2 text-right font-medium ${amtCls}">${p.net_position>=0?'+':''}${fmtAmt(p.net_position)}</td>
+        <td class="py-2 text-center">${settled?'<span class="text-[10px] bg-gray-100 text-gray-400 px-1.5 py-0.5 rounded">清算済</span>':'<span class="text-[10px] bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded">未清算</span>'}</td>
+      </tr>`;
+    }).join('')}</tbody></table></div>` : '<p class="text-gray-400 text-sm">ポジションデータなし</p>'}
+  `);
+}
+
+async function dnsKick() {
+  const r = await api('POST', '/internal/dns/kick', { business_date: new Date().toISOString().slice(0,10) }, cronH());
+  toast('DNS Kick: ' + (r.state || r.error || 'OK'), r.error ? 'error' : 'success');
+  renderPage('dns');
+}
+async function dnsSettle(cycleId) {
+  if (!cycleId) { toast('先にDNS Kickを実行してください', 'error'); return; }
+  const r = await api('POST', '/internal/dns/settle', { cycle_id: cycleId }, cronH());
+  toast('DNS Settle: ' + (r.result || r.error || 'OK'), r.error ? 'error' : 'success');
+  renderPage('dns');
+}
+
+// ---------- Ops ----------
+async function renderOps() {
+  document.getElementById('app').innerHTML =
+    card('運用操作', `
+      <div class="flex gap-3 flex-wrap">
+        <button class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md text-sm transition-colors" onclick="doSeed()">全データリセット (SEED)</button>
+        <button class="border border-gray-300 hover:border-gray-400 px-4 py-2 rounded-md text-sm transition-colors" onclick="doEod()">EODバッチ実行</button>
+        <button class="border border-gray-300 hover:border-gray-400 px-4 py-2 rounded-md text-sm transition-colors" onclick="doSweep()">タイムアウト巡回</button>
+      </div>
+      <div id="opsResult" class="mt-4"></div>
+    `) +
+    card('CASE管理', '<div id="caseList" class="text-sm text-gray-400">読込中...</div>') +
+    card('RTP請求一覧', '<div id="rtpList" class="text-sm text-gray-400"><p class="text-gray-400 py-2 text-xs"><i class="fa-solid fa-clock mr-1"></i> RTP請求はRTPレーンの送金で利用できます</p></div>');
+  loadCases();
+}
+
+async function doSeed() {
+  if (!confirm('全データを初期化しますか？この操作は取り消せません。')) return;
+  const el = document.getElementById('opsResult');
+  if (el) el.innerHTML = '<div class="text-xs text-gray-400 py-2">リセット中...</div>';
+  try {
+    const resp = await fetch(BASE + '/internal/seed', { method: 'POST', headers: { 'Content-Type': 'application/json', ...cronH() } });
+    const r = await resp.json().catch(() => ({}));
+    if (!resp.ok || r.error) {
+      const msg = r.message || r.error || `HTTP ${resp.status}`;
+      if (el) el.innerHTML = `<div class="bg-red-50 border border-red-200 rounded-lg p-4 text-sm text-red-700">エラー: ${msg}</div>`;
+      toast('リセット失敗: ' + msg, 'error');
+      return;
+    }
+    if (el) el.innerHTML = `
+      <div class="bg-gray-50 rounded-lg p-4 text-sm">
+        <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1">
+          <dt class="text-gray-400">結果</dt><dd>${r.result}</dd>
+          <dt class="text-gray-400">リセット日時</dt><dd>${r.reset_at}</dd>
+        </dl>
+      </div>`;
+    toast('全データリセット完了', 'success');
+    await loadBanks();
+  } catch(e) {
+    const msg = e.message || String(e);
+    if (el) el.innerHTML = `<div class="bg-red-50 border border-red-200 rounded-lg p-4 text-sm text-red-700">エラー: ${msg}</div>`;
+    toast('リセット失敗: ' + msg, 'error');
+  }
+}
+async function doEod() {
+  const r = await api('POST', '/internal/cron/eod', null, cronH());
+  toast('EODバッチ: ' + JSON.stringify(r).slice(0,80), 'success');
+}
+async function doSweep() {
+  const r = await api('POST', '/internal/cron/timeout-sweep', null, cronH());
+  toast('タイムアウト巡回: swept=' + (r.swept||0), 'success');
+}
+async function loadCases() {
+  const txRes = await api('GET', '/api/transactions?limit=100');
+  const el = document.getElementById('caseList');
+  if (!el) return;
+  const cased = (txRes.transactions||[]).filter(t => t.state === 'SUSPENDED' || t.state === 'FAILED_EXECUTION');
+  if (cased.length === 0) { el.innerHTML = '<p class="text-gray-400 py-2">オープンCASEはありません</p>'; return; }
+  el.innerHTML = `<div class="overflow-x-auto"><table class="w-full text-sm"><thead><tr class="border-b border-gray-200 text-left">
+    <th class="pb-2 text-xs text-gray-400 font-medium">取引ID</th><th class="pb-2 text-xs text-gray-400 font-medium">状態</th>
+    <th class="pb-2 text-xs text-gray-400 font-medium">レーン</th><th class="pb-2 text-xs text-gray-400 font-medium">日時</th>
+  </tr></thead><tbody class="divide-y divide-gray-100">${cased.map(t => `<tr class="hover:bg-gray-50">
+    <td class="py-2 mono text-[11px]">${t.txid}</td><td class="py-2">${badge(t.state)}</td>
+    <td class="py-2 text-xs">${t.lane}</td><td class="py-2 text-[11px] text-gray-400">${fmtDate(t.created_at)}</td>
+  </tr>`).join('')}</tbody></table></div>`;
+}
+
+// ========== sha256hex (Web Crypto API) ==========
+async function sha256hex(text) {
+  const buf = await globalThis.crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+
+// ========== Liquidity ==========
+let liqTimer = null;
+
+async function renderLiquidity() {
+  document.getElementById('app').innerHTML = `
+    <div class="mb-4 flex items-center justify-between">
+      <div class="text-xs text-gray-400">30秒ごと自動更新 | 最終更新: <span id="liqLastUpdate">-</span></div>
+      <button onclick="refreshLiquidity()" class="text-xs text-gray-400 hover:text-gray-600 px-3 py-1 rounded border border-gray-200"><i class="fa-solid fa-arrows-rotate"></i> 手動更新</button>
+    </div>
+    <div id="liqGauges" class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6"></div>
+    <div class="bg-white rounded-lg border border-gray-200 p-5 fade-in">
+      <h3 class="font-medium text-gray-700 text-sm mb-4 pb-2 border-b border-gray-100">DNS ネットポジション</h3>
+      <div id="liqDnsTable"><div class="text-gray-400 text-sm py-4">読み込み中...</div></div>
+    </div>`;
+  if (liqTimer) clearInterval(liqTimer);
+  await refreshLiquidity();
+  liqTimer = setInterval(() => { if (currentPage === 'liquidity') refreshLiquidity(); else clearInterval(liqTimer); }, 30000);
+}
+
+async function refreshLiquidity() {
+  await loadBanks();
+  const today = new Date().toISOString().slice(0,10);
+  let dnsPos = [];
+  try { const r = await api('GET', `/api/dns/${today}/position`); dnsPos = r.positions || []; } catch(e) {}
+
+  const gaugesEl = document.getElementById('liqGauges');
+  if (!gaugesEl) return;
+  gaugesEl.innerHTML = '';
+
+  for (const bank of banks.slice(0, 8)) {
+    let reserved = 0, total = 1;
+    try {
+      const [suspR, acctR] = await Promise.all([
+        api('GET', `/bank/${bank.bank_id}/v1/teller/suspense`, null, {'X-Bank-Id': bank.bank_id, 'X-Teller-Id': 'TELLER-001'}),
+        api('GET', `/bank/${bank.bank_id}/v1/teller/accounts`, null, {'X-Bank-Id': bank.bank_id, 'X-Teller-Id': 'TELLER-001'}),
+      ]);
+      const susps = suspR.suspense || suspR.suspense_accounts || suspR.accounts || [];
+      reserved = susps.filter(s => s.status === 'RESERVED' || s.account_type === 'SUSPENSE').reduce((a, s) => a + (s.balance || 0), 0);
+      const accts = acctR.accounts || [];
+      total = accts.filter(a => a.account_type !== 'SUSPENSE').reduce((a, x) => a + (x.balance || 1), 1);
+    } catch(e) {}
+    const pct = Math.min(100, Math.round(reserved / total * 100));
+
+    const div = document.createElement('div');
+    div.className = 'bg-white rounded-lg border border-gray-200 p-3 fade-in';
+    div.innerHTML = `<div class="text-xs text-gray-500 mb-1 truncate">${esc(bank.bank_name || bank.bank_id)}</div><div id="gauge-${bank.bank_id}" style="height:120px"></div><div class="text-center text-[11px] text-gray-400 mt-1">H利用: ${pct}%</div>`;
+    gaugesEl.appendChild(div);
+
+    const chart = echarts.init(div.querySelector(`#gauge-${bank.bank_id}`));
+    chart.setOption({ series: [{ type: 'gauge', min: 0, max: 100, radius: '90%',
+      axisLine: { lineStyle: { color: [[0.5,'#34d399'],[0.8,'#fbbf24'],[1,'#f87171']], width: 10 } },
+      pointer: { length: '60%', width: 4 },
+      detail: { formatter: '{value}%', fontSize: 12, offsetCenter: [0, '70%'] },
+      data: [{ value: pct }],
+      axisTick: { show: false }, splitLine: { show: false }, axisLabel: { show: false },
+    }] });
+  }
+
+  const dnsEl = document.getElementById('liqDnsTable');
+  if (dnsEl) {
+    if (!dnsPos.length) {
+      dnsEl.innerHTML = '<p class="text-gray-400 text-sm py-2">本日のDNSポジションなし</p>';
+    } else {
+      dnsEl.innerHTML = `<div class="overflow-x-auto"><table class="w-full text-sm"><thead><tr class="border-b border-gray-200 text-left">
+        <th class="pb-2 text-xs text-gray-400 font-medium">銀行</th>
+        <th class="pb-2 text-xs text-gray-400 font-medium text-right">Debit</th>
+        <th class="pb-2 text-xs text-gray-400 font-medium text-right">Credit</th>
+        <th class="pb-2 text-xs text-gray-400 font-medium text-right">Net</th>
+      </tr></thead><tbody class="divide-y divide-gray-100">${dnsPos.map(p => {
+        const net = (p.gross_receive || 0) - (p.gross_send || 0);
+        const netCls = net >= 0 ? 'text-emerald-600' : 'text-red-600';
+        return `<tr class="hover:bg-gray-50">
+          <td class="py-2 text-xs">${bankName(p.bank_id)}</td>
+          <td class="py-2 text-xs text-right">${fmtAmt(p.gross_send || 0)}</td>
+          <td class="py-2 text-xs text-right">${fmtAmt(p.gross_receive || 0)}</td>
+          <td class="py-2 text-xs text-right font-medium ${netCls}">${net >= 0 ? '+' : ''}${fmtAmt(net)}</td>
+        </tr>`;
+      }).join('')}</tbody></table></div>`;
+    }
+  }
+
+  const upEl = document.getElementById('liqLastUpdate');
+  if (upEl) upEl.textContent = new Date().toLocaleTimeString('ja-JP');
+}
+
+// ========== Network ==========
+let netChart = null;
+let netFilter = 'all';
+
+async function renderNetwork() {
+  document.getElementById('app').innerHTML = `
+    <div class="mb-4 flex items-center gap-2">
+      <span class="text-xs text-gray-400">フィルタ:</span>
+      ${['all','SETTLED','processing'].map(f =>
+        `<button onclick="setNetFilter('${f}')" id="netf-${f}" class="text-xs px-3 py-1 rounded-full border ${f==='all'?'border-brand-500 text-brand-600 bg-brand-50':'border-gray-200 text-gray-400 hover:border-gray-300'}">${f==='all'?'全件':f==='SETTLED'?'決済完了':'処理中'}</button>`
+      ).join('')}
+      <button onclick="renderNetwork()" class="ml-auto text-xs text-gray-400 hover:text-gray-600 px-3 py-1 rounded border border-gray-200"><i class="fa-solid fa-arrows-rotate"></i> 更新</button>
+    </div>
+    <div class="bg-white rounded-lg border border-gray-200 p-4 mb-4">
+      <div id="netChartDiv" style="height:560px"></div>
+    </div>
+    <div id="netBankDetail"></div>`;
+  netFilter = 'all';
+  await loadNetworkData();
+}
+
+async function setNetFilter(f) {
+  netFilter = f;
+  document.querySelectorAll('[id^="netf-"]').forEach(el => {
+    const active = el.id === `netf-${f}`;
+    el.className = `text-xs px-3 py-1 rounded-full border ${active ? 'border-brand-500 text-brand-600 bg-brand-50' : 'border-gray-200 text-gray-400 hover:border-gray-300'}`;
+  });
+  await loadNetworkData();
+}
+
+async function loadNetworkData() {
+  await loadBanks();
+  const txRes = await api('GET', '/api/transactions?limit=500');
+  let txs = txRes.transactions || [];
+  if (netFilter === 'SETTLED') txs = txs.filter(t => t.state === 'SETTLED');
+  else if (netFilter === 'processing') txs = txs.filter(t => t.state !== 'SETTLED' && t.state !== 'FAILED_EXECUTION' && t.state !== 'CANCELLED');
+
+  const edgeMap = {};
+  const txCount = {};
+  for (const tx of txs) {
+    if (!tx.payer_bank_id || !tx.payee_bank_id) continue;
+    const key = `${tx.payer_bank_id}->${tx.payee_bank_id}`;
+    if (!edgeMap[key]) edgeMap[key] = { source: tx.payer_bank_id, target: tx.payee_bank_id, count: 0, total: 0 };
+    edgeMap[key].count++;
+    edgeMap[key].total += tx.amount?.value ?? 0;
+    txCount[tx.payer_bank_id] = (txCount[tx.payer_bank_id] || 0) + 1;
+    txCount[tx.payee_bank_id] = (txCount[tx.payee_bank_id] || 0) + 1;
+  }
+
+  const activeBankIds = new Set([...txs.map(t => t.payer_bank_id), ...txs.map(t => t.payee_bank_id)].filter(Boolean));
+  const nodeList = banks.filter(b => activeBankIds.has(b.bank_id) || banks.length <= 5);
+
+  const el = document.getElementById('netChartDiv');
+  if (!el) return;
+  if (netChart) { netChart.dispose(); netChart = null; }
+  const PALETTE = ['#4f7cff','#22c55e','#f59e0b','#ef4444','#8b5cf6',
+                   '#06b6d4','#ec4899','#10b981','#f97316','#6366f1'];
+  netChart = echarts.init(el);
+  netChart.setOption({
+    tooltip: { formatter: p => p.dataType === 'node'
+      ? `<b>${p.data.name}</b><br>取引: ${txCount[p.data.id]||0}件`
+      : `${bankName(p.data.source)} → ${bankName(p.data.target)}<br>${p.data.count}件 / ${fmtAmt(p.data.total)}` },
+    series: [{
+      type: 'graph', layout: 'force', roam: true, animation: true,
+      emphasis: { focus: 'adjacency' },
+      edgeSymbol: ['none', 'arrow'],
+      edgeSymbolSize: [0, 8],
+      label: { show: true, fontSize: 11 },
+      lineStyle: { curveness: 0.2, opacity: 0.6 },
+      nodes: nodeList.map(b => ({
+        id: b.bank_id, name: b.bank_name || b.bank_id,
+        symbolSize: Math.max(22, Math.min(55, 20 + Math.sqrt(txCount[b.bank_id] || 0) * 2)),
+        itemStyle: { color: PALETTE[parseInt(b.bank_id) % PALETTE.length] },
+      })),
+      edges: Object.values(edgeMap).map(e => ({
+        source: e.source, target: e.target, count: e.count, total: e.total,
+        lineStyle: { width: Math.max(1, Math.log2(e.count + 1)) },
+      })),
+      force: { repulsion: 3000, gravity: 0.15, edgeLength: [80, 250] },
+    }],
+  });
+  netChart.on('click', params => {
+    if (params.dataType === 'node') showBankTxList(params.data.id, txs);
+  });
+}
+
+function showBankTxList(bankId, txs) {
+  const filtered = txs.filter(t => t.payer_bank_id === bankId || t.payee_bank_id === bankId);
+  const el = document.getElementById('netBankDetail');
+  if (!el) return;
+  el.innerHTML = card(`銀行 ${bankName(bankId)} の取引 (${filtered.length}件)`,
+    `<div class="overflow-x-auto"><table class="w-full text-sm"><thead><tr class="border-b border-gray-200 text-left">
+      <th class="pb-2 text-xs text-gray-400 font-medium">TXID</th>
+      <th class="pb-2 text-xs text-gray-400 font-medium">状態</th>
+      <th class="pb-2 text-xs text-gray-400 font-medium">レーン</th>
+      <th class="pb-2 text-xs text-gray-400 font-medium">相手先</th>
+      <th class="pb-2 text-xs text-gray-400 font-medium text-right">金額</th>
+    </tr></thead><tbody class="divide-y divide-gray-100">${filtered.slice(0,30).map(t => `<tr class="hover:bg-gray-50">
+      <td class="py-1 mono text-[11px]">${t.txid?.slice(0,20)||'-'}</td>
+      <td class="py-1">${badge(t.state)}</td>
+      <td class="py-1 text-xs">${t.lane||'-'}</td>
+      <td class="py-1 text-xs">${t.payer_bank_id===bankId ? '→ '+bankName(t.payee_bank_id) : '← '+bankName(t.payer_bank_id)}</td>
+      <td class="py-1 text-xs text-right">${fmtAmt(t.amount?.value||0)}</td>
+    </tr>`).join('')}</tbody></table></div>`
+  );
+}
+
+// ========== Simulator ==========
+let simAccounts = [];
+let simTimer = null;
+let simStats = { sent: 0, ok: 0, err: 0, htlcClaim: 0 };
+let simStartTime = null;
+let simElapsedTimer = null;
+let simMaxTx = 0;
+
+const SIM_SURNAMES = ['田中','佐藤','鈴木','高橋','伊藤','渡辺','山本','中村','小林','加藤','吉田','山田','佐々木','山口','松本','井上','木村','林','清水','山崎'];
+const SIM_GIVEN   = ['太郎','花子','一郎','由美','健太','さくら','大輔','美咲','翔','なな','はると','あいか','れん','みゆ','そうた','りか','ゆうき','えみ','こうき','まい'];
+const SIM_STORES  = ['スーパー','コンビニ','カフェ','薬局','書店','飲食店','雑貨店','ガソリン','クリニック','美容室','電気店','ホームセンター'];
+const SIM_BANKS = [
+  {id:'001',name:'長岡銀行'},{id:'002',name:'尾張銀行'},{id:'003',name:'加賀銀行'},{id:'004',name:'肥前銀行'},
+  {id:'005',name:'薩摩銀行'},{id:'006',name:'越後銀行'},{id:'007',name:'讃岐銀行'},{id:'008',name:'備後銀行'},
+  {id:'009',name:'淡路銀行'},{id:'010',name:'日向銀行'},{id:'011',name:'紀伊銀行'},{id:'012',name:'相模銀行'},
+  {id:'013',name:'駿河銀行'},{id:'014',name:'甲斐銀行'},{id:'015',name:'信濃銀行'},{id:'016',name:'近江銀行'},
+  {id:'017',name:'丹波銀行'},{id:'018',name:'大隅銀行'},{id:'019',name:'播磨銀行'},{id:'020',name:'美作銀行'},
+];
+
+// ---------- API仕様書（Swagger UI） ----------
+let swaggerLoaded = false;
+function renderApiSpec() {
+  const app = document.getElementById('app');
+  app.innerHTML = `
+    ${subnav('apispecNav', [{key:'zc',label:'ZC Core API'},{key:'bank',label:'Bank API'}])}
+    <div id="swagger-ui-container" style="height:calc(100vh - 160px); overflow-y:auto; background:#fff; border-radius:8px; border:1px solid #e5e7eb;"></div>
+  `;
+
+  function loadScript(src) {
+    return new Promise((resolve, reject) => {
+      if (document.querySelector('script[src="' + src + '"]')) { resolve(); return; }
+      const s = document.createElement('script'); s.src = src; s.onload = resolve; s.onerror = reject;
+      document.head.appendChild(s);
+    });
+  }
+  function loadStyle(href) {
+    if (document.querySelector('link[href="' + href + '"]')) return;
+    const l = document.createElement('link'); l.rel = 'stylesheet'; l.href = href;
+    document.head.appendChild(l);
+  }
+
+  function renderSwagger(url) {
+    const container = document.getElementById('swagger-ui-container');
+    if (!container) return;
+    container.innerHTML = '';
+    SwaggerUIBundle({ url, dom_id: '#swagger-ui-container', deepLinking: true, layout: 'BaseLayout', tryItOutEnabled: true });
+  }
+
+  async function initSwagger(tab) {
+    if (!swaggerLoaded) {
+      loadStyle('https://unpkg.com/swagger-ui-dist@5/swagger-ui.css');
+      await loadScript('https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js');
+      swaggerLoaded = true;
+    }
+    const url = tab === 'bank' ? '/api/openapi/bank.yaml' : '/api/openapi/zc.yaml';
+    renderSwagger(url);
+  }
+
+  bindSubnav('apispecNav', tab => initSwagger(tab));
+  initSwagger('zc');
+}
+
+// ---------- Documentation ----------
+function renderDocumentation() {
+  const app = document.getElementById('app');
+  app.innerHTML = `
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 fade-in">
+      <!-- API Contracts -->
+      <a href="https://github.com/pochatt/zenith-coordinator/blob/main/docs/specs/32_api_contracts.md" target="_blank" class="block bg-white rounded-lg border border-gray-200 p-5 hover:border-brand-500 hover:shadow-md transition-all">
+        <div class="flex items-start gap-3 mb-3">
+          <i class="fa-solid fa-file-code text-brand-600 text-xl"></i>
+          <h3 class="font-medium text-gray-700">API Contracts</h3>
+        </div>
+        <p class="text-xs text-gray-500 mb-3">全エンドポイント・リクエスト/レスポンス形式・バリデーションルールの詳細仕様</p>
+        <div class="text-[10px] text-gray-400">📄 仕様書</div>
+      </a>
+
+      <!-- Database Schema -->
+      <a href="https://github.com/pochatt/zenith-coordinator/blob/main/docs/specs/31_schema.md" target="_blank" class="block bg-white rounded-lg border border-gray-200 p-5 hover:border-brand-500 hover:shadow-md transition-all">
+        <div class="flex items-start gap-3 mb-3">
+          <i class="fa-solid fa-database text-brand-600 text-xl"></i>
+          <h3 class="font-medium text-gray-700">Database Schema</h3>
+        </div>
+        <p class="text-xs text-gray-500 mb-3">28テーブルの構造・カラム定義・関係・初期データ</p>
+        <div class="text-[10px] text-gray-400">📊 スキーマ設計書</div>
+      </a>
+
+      <!-- Zenith Public Spec -->
+      <a href="https://github.com/pochatt/zenith-coordinator/blob/main/docs/specs/20_method_design.md" target="_blank" class="block bg-white rounded-lg border border-gray-200 p-5 hover:border-brand-500 hover:shadow-md transition-all">
+        <div class="flex items-start gap-3 mb-3">
+          <i class="fa-solid fa-book text-brand-600 text-xl"></i>
+          <h3 class="font-medium text-gray-700">Zenith Architecture</h3>
+        </div>
+        <p class="text-xs text-gray-500 mb-3">支払レーン・状態遷移・決済フロー・全体設計思想</p>
+        <div class="text-[10px] text-gray-400">🏗️ 設計書</div>
+      </a>
+
+      <!-- Business Policy -->
+      <a href="https://github.com/pochatt/zenith-coordinator/blob/main/docs/specs/10_requirements.md" target="_blank" class="block bg-white rounded-lg border border-gray-200 p-5 hover:border-brand-500 hover:shadow-md transition-all">
+        <div class="flex items-start gap-3 mb-3">
+          <i class="fa-solid fa-scales text-brand-600 text-xl"></i>
+          <h3 class="font-medium text-gray-700">Business Policy</h3>
+        </div>
+        <p class="text-xs text-gray-500 mb-3">取引制度・業務ルール・制約・ポリシー定義</p>
+        <div class="text-[10px] text-gray-400">📋 ポリシー書</div>
+      </a>
+
+      <!-- File Structure -->
+      <a href="https://github.com/pochatt/zenith-coordinator/blob/main/docs/specs/file_structure.md" target="_blank" class="block bg-white rounded-lg border border-gray-200 p-5 hover:border-brand-500 hover:shadow-md transition-all">
+        <div class="flex items-start gap-3 mb-3">
+          <i class="fa-solid fa-folder-tree text-brand-600 text-xl"></i>
+          <h3 class="font-medium text-gray-700">File Structure</h3>
+        </div>
+        <p class="text-xs text-gray-500 mb-3">ディレクトリ構成・各モジュールの役割・コード構成</p>
+        <div class="text-[10px] text-gray-400">📁 コード構成</div>
+      </a>
+
+      <!-- English Specs -->
+      <a href="https://github.com/pochatt/zenith-coordinator/tree/main/docs/specs" target="_blank" class="block bg-white rounded-lg border border-gray-200 p-5 hover:border-brand-500 hover:shadow-md transition-all">
+        <div class="flex items-start gap-3 mb-3">
+          <i class="fa-solid fa-globe text-brand-600 text-xl"></i>
+          <h3 class="font-medium text-gray-700">English Docs</h3>
+        </div>
+        <p class="text-xs text-gray-500 mb-3">*.en.md ファイルで英語版仕様書を確認</p>
+        <div class="text-[10px] text-gray-400">🌍 多言語対応</div>
+      </a>
+    </div>
+  `;
+}
+
+function renderSimulator() {
+  document.getElementById('app').innerHTML = `
+    ${subnav('simNav', [{key:'setup',label:'セットアップ'},{key:'run',label:'シミュレーション'},{key:'scenario',label:'シナリオ'}])}
+    <div id="simSetupTab">
+      <div class="bg-white rounded-lg border border-gray-200 p-5 fade-in mb-4">
+        <h3 class="font-medium text-gray-700 text-sm mb-3 pb-2 border-b border-gray-100">大規模初期化</h3>
+        <p class="text-xs text-gray-500 mb-4">20銀行 × 200口座（個人180 + 店舗20）+ 各口座¥100万〜¥500万を入金します。</p>
+        <div class="flex gap-2">
+          <button onclick="doSimSetup()" id="simSetupBtn" class="bg-brand-600 text-white text-sm px-5 py-2 rounded-lg hover:bg-brand-700 transition-colors">大規模初期化を実行</button>
+          <button onclick="doSimSetupFromExisting()" id="simSetupFromExistingBtn" class="bg-blue-600 text-white text-sm px-5 py-2 rounded-lg hover:bg-blue-700 transition-colors">既存口座で開始</button>
+        </div>
+        <div class="mt-4" id="simSetupProgress" style="display:none">
+          <progress id="simProgressBar" value="0" max="4000" class="w-full h-2"></progress>
+          <div id="simProgressText" class="text-xs text-gray-500 mt-1">準備中...</div>
+        </div>
+        <div id="simSetupLog" class="mt-4 font-mono text-[11px] text-gray-500 max-h-40 overflow-y-auto space-y-0.5"></div>
+        <div id="simSetupSummary" class="mt-4"></div>
+      </div>
+    </div>
+    <div id="simRunTab" style="display:none">
+      <div class="bg-white rounded-lg border border-gray-200 p-5 fade-in mb-4">
+        <div class="flex items-center gap-4 mb-4">
+          <button onclick="simStart()" id="simStartBtn" class="bg-emerald-600 text-white text-sm px-6 py-2 rounded-lg hover:bg-emerald-700 transition-colors font-medium"><i class="fa-solid fa-play"></i> Start</button>
+          <button onclick="simStop()" id="simStopBtn" class="bg-red-500 text-white text-sm px-6 py-2 rounded-lg hover:bg-red-600 transition-colors font-medium" style="display:none"><i class="fa-solid fa-stop"></i> Stop</button>
+          <div id="simRunIndicator" class="flex items-center gap-2 text-xs text-gray-400" style="display:none">
+            <span class="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span id="simElapsed">00:00:00</span> 経過
+          </div>
+        </div>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+          <div class="border border-gray-200 rounded p-3 text-center"><div class="text-lg font-serif text-brand-600" id="statSent">0</div><div class="text-[11px] text-gray-400">送信</div></div>
+          <div class="border border-gray-200 rounded p-3 text-center"><div class="text-lg font-serif text-emerald-600" id="statOk">0</div><div class="text-[11px] text-gray-400">成功</div></div>
+          <div class="border border-gray-200 rounded p-3 text-center"><div class="text-lg font-serif text-red-500" id="statErr">0</div><div class="text-[11px] text-gray-400">エラー</div></div>
+          <div class="border border-gray-200 rounded p-3 text-center"><div class="text-lg font-serif text-blue-600" id="statHtlc">0</div><div class="text-[11px] text-gray-400">HTLC Claim</div></div>
+        </div>
+        <div class="mb-4 grid grid-cols-2 gap-4">
+          <div>
+            <label class="text-xs text-gray-500">TPS: <span id="tpsVal">5</span></label>
+            <input type="range" id="simTps" min="1" max="10" value="5" oninput="document.getElementById('tpsVal').textContent=this.value" class="w-full mt-1">
+          </div>
+          <div>
+            <label class="text-xs text-gray-500">金額範囲 (円)</label>
+            <div class="flex gap-2 mt-1">
+              <input type="number" id="simMinAmt" value="1000" class="w-full text-xs border border-gray-200 rounded px-2 py-1">
+              <span class="text-gray-400 text-xs self-center">〜</span>
+              <input type="number" id="simMaxAmt" value="100000" class="w-full text-xs border border-gray-200 rounded px-2 py-1">
+            </div>
+          </div>
+        </div>
+        <div class="mb-4">
+          <label class="text-xs text-gray-500 block mb-2">レーン比率（合計100%推奨）</label>
+          <div class="grid grid-cols-3 gap-3" id="laneSliders">
+            ${[['EXPRESS',40],['STANDARD',20],['BULK',20],['HIGH_VALUE',0],['HTLC',10],['GTID',10]].map(([l,v]) =>
+              `<div><label class="text-[11px] text-gray-400">${l}: <span id="lp-${l}">${v}</span>%</label>
+               <input type="range" id="ls-${l}" min="0" max="100" value="${v}" oninput="document.getElementById('lp-${l}').textContent=this.value" class="w-full"></div>`
+            ).join('')}
+          </div>
+        </div>
+        <div>
+          <div class="text-xs text-gray-500 mb-1">ライブログ（直近50件）</div>
+          <div id="simLog" class="font-mono text-[11px] bg-gray-900 text-gray-200 rounded p-3 h-48 overflow-y-auto space-y-0.5"></div>
+        </div>
+      </div>
+    </div>
+    <div id="simScenarioTab" style="display:none">
+      <div class="bg-white rounded-lg border border-gray-200 p-5 fade-in">
+        <h3 class="font-medium text-gray-700 text-sm mb-4 pb-2 border-b border-gray-100">プリセットシナリオ</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          ${[
+            {name:'Express ラッシュ', desc:'TPS=10, EXPRESS 100%, 20件', tps:10, lanes:{EXPRESS:100}, max:20},
+            {name:'HTLC アトミック', desc:'TPS=2, HTLC 100%, 10件', tps:2, lanes:{HTLC:100}, max:10},
+            {name:'GTID マルチレッグ', desc:'TPS=2, GTID 100%, 10件', tps:2, lanes:{GTID:100}, max:10},
+            {name:'Bulk バッチ', desc:'TPS=5, BULK 100%, 30件', tps:5, lanes:{BULK:100}, max:30},
+            {name:'混合負荷テスト', desc:'TPS=5, 混合レーン, 50件', tps:5, lanes:{EXPRESS:40,STANDARD:20,BULK:20,HTLC:10,GTID:10}, max:50},
+          ].map(s => `<button onclick='applyScenario(${JSON.stringify(s)})' class="text-left border border-gray-200 rounded-lg p-4 hover:border-brand-300 hover:bg-brand-50 transition-colors">
+            <div class="font-medium text-sm text-gray-700">${s.name}</div>
+            <div class="text-xs text-gray-400 mt-1">${s.desc}</div>
+          </button>`).join('')}
+        </div>
+      </div>
+    </div>`;
+
+  bindSubnav('simNav', tab => {
+    document.getElementById('simSetupTab').style.display = tab === 'setup' ? '' : 'none';
+    document.getElementById('simRunTab').style.display   = tab === 'run'   ? '' : 'none';
+    document.getElementById('simScenarioTab').style.display = tab === 'scenario' ? '' : 'none';
+  });
+}
+
+function simLog(msg) {
+  const el = document.getElementById('simLog');
+  if (!el) return;
+  const time = new Date().toLocaleTimeString('ja-JP');
+  const div = document.createElement('div');
+  div.textContent = `[${time}] ${msg}`;
+  el.appendChild(div);
+  while (el.children.length > 50) el.removeChild(el.firstChild);
+  el.scrollTop = el.scrollHeight;
+}
+
+function updateSimStats() {
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+  set('statSent', simStats.sent);
+  set('statOk',   simStats.ok);
+  set('statErr',  simStats.err);
+  set('statHtlc', simStats.htlcClaim);
+}
+
+function pickLane() {
+  const lanes = ['EXPRESS','STANDARD','BULK','HIGH_VALUE','HTLC','GTID'];
+  const weights = lanes.map(l => { const el = document.getElementById(`ls-${l}`); return el ? parseInt(el.value) : 0; });
+  const total = weights.reduce((a,b) => a+b, 0);
+  if (total === 0) return 'EXPRESS';
+  let r = Math.random() * total;
+  for (let i = 0; i < lanes.length; i++) { r -= weights[i]; if (r <= 0) return lanes[i]; }
+  return 'EXPRESS';
+}
+
+async function sendOneTx() {
+  if (!simAccounts.length) return;
+  const minAmt = parseInt(document.getElementById('simMinAmt')?.value || '1000');
+  const maxAmt = parseInt(document.getElementById('simMaxAmt')?.value || '100000');
+  const payer = simAccounts[Math.floor(Math.random() * simAccounts.length)];
+  let payee;
+  let tries = 0;
+  do { payee = simAccounts[Math.floor(Math.random() * simAccounts.length)]; tries++; }
+  while ((payee.accountId === payer.accountId || (payee.bankId === payer.bankId && Math.random() > 0.1)) && tries < 20);
+
+  const lane = pickLane();
+  const amount = Math.floor(Math.random() * (maxAmt - minAmt + 1)) + minAmt;
+
+  try {
+    if (lane === 'HTLC') {
+      const preimageBytes = new Uint8Array(32);
+      crypto.getRandomValues(preimageBytes);
+      const preimage = Array.from(preimageBytes).map(b => b.toString(16).padStart(2,'0')).join('');
+      const hashlock = await sha256hex(preimage);
+      const r = await api('POST', '/api/htlc/create', {
+        htlc_id: 'HTLC-' + uuid(), hashlock,
+        timelock: new Date(Date.now() + 600_000).toISOString(),
+        amount: { value: amount, currency: 'JPY' },
+        payer_bank_id: payer.bankId, payer_account_hash: payer.accountId,
+        payee_bank_id: payee.bankId, payee_account_hash: payee.accountId,
+        idempotency_key: uuid(),
+      });
+      simLog(`HTLC ${r.htlc_id ?? '?'} preimage=${preimage} → created, claiming in 800ms...`);
+      simStats.ok++;
+      setTimeout(async () => {
+        try {
+          await api('POST', `/api/htlc/${r.htlc_id}/claim`, { htlc_id: r.htlc_id, preimage, idempotency_key: uuid() });
+          simStats.htlcClaim++; updateSimStats();
+          simLog(`HTLC ${r.htlc_id} → claimed`);
+        } catch(e) { simLog(`HTLC ${r.htlc_id} claim error: ${e.message}`); }
+      }, 800);
+    } else if (lane === 'GTID') {
+      const gtid = 'GT-' + uuid();
+      // leg_id は GtidLegs の PRIMARY KEY (グローバル一意) のため uuid で生成
+      const leg1id = 'L-' + uuid().slice(0, 8);
+      const leg2id = 'L-' + uuid().slice(0, 8);
+      await api('POST', '/api/gtid/register', {
+        gtid, legs: [
+          { leg_id: leg1id, role: 'PAYER', bank_id: payer.bankId, account_hash: payer.accountId, amount: { value: amount, currency: 'JPY' } },
+          { leg_id: leg2id, role: 'PAYEE', bank_id: payee.bankId, account_hash: payee.accountId, amount: { value: amount, currency: 'JPY' } },
+        ],
+        expires_at: new Date(Date.now() + 300_000).toISOString(), idempotency_key: uuid(),
+      });
+      simLog(`GTID ${gtid} → registered`);
+      simStats.ok++;
+    } else {
+      const txid = 'TX-' + uuid();
+      await api('POST', '/api/transfers', {
+        schema_version: '1.0', message_type: 'EVENT', name: 'PaymentInitiated',
+        message_id: uuid(), idempotency_key: uuid(), occurred_at: new Date().toISOString(),
+        txid, lane, amount: { value: amount, currency: 'JPY' },
+        payer: { bank_id: payer.bankId, account_hash: payer.accountId },
+        payee: { bank_id: payee.bankId, account_hash: payee.accountId },
+        purpose: ['P2P','MERCHANT','BILL','SALARY'][Math.floor(Math.random()*4)],
+      });
+      simLog(`${txid.slice(0,16)}... ${lane} 銀行${payer.bankId}→銀行${payee.bankId} ¥${amount.toLocaleString()} → RECEIVED`);
+      simStats.ok++;
+    }
+  } catch(e) {
+    simStats.err++;
+    simLog(`ERROR: ${e.message}`);
+  }
+  simStats.sent++;
+  updateSimStats();
+
+  if (simMaxTx > 0 && simStats.sent >= simMaxTx) simStop();
+}
+
+function simStart() {
+  if (simTimer) return;
+  if (!simAccounts.length) { toast('先にセットアップを実行してください', 'error'); return; }
+  simStats = { sent: 0, ok: 0, err: 0, htlcClaim: 0 };
+  simMaxTx = 0;
+  updateSimStats();
+  const tps = parseInt(document.getElementById('simTps')?.value || '5');
+  const interval = Math.floor(1000 / tps);
+  simTimer = setInterval(sendOneTx, interval);
+  simStartTime = Date.now();
+  simElapsedTimer = setInterval(() => {
+    const el = document.getElementById('simElapsed');
+    if (!el) return;
+    const s = Math.floor((Date.now() - simStartTime) / 1000);
+    el.textContent = `${String(Math.floor(s/3600)).padStart(2,'0')}:${String(Math.floor(s%3600/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;
+  }, 1000);
+  const startBtn = document.getElementById('simStartBtn');
+  const stopBtn  = document.getElementById('simStopBtn');
+  const ind      = document.getElementById('simRunIndicator');
+  if (startBtn) startBtn.style.display = 'none';
+  if (stopBtn)  stopBtn.style.display  = '';
+  if (ind)      ind.style.display      = '';
+}
+
+function simStop() {
+  if (simTimer) { clearInterval(simTimer); simTimer = null; }
+  if (simElapsedTimer) { clearInterval(simElapsedTimer); simElapsedTimer = null; }
+  const startBtn = document.getElementById('simStartBtn');
+  const stopBtn  = document.getElementById('simStopBtn');
+  const ind      = document.getElementById('simRunIndicator');
+  if (startBtn) startBtn.style.display = '';
+  if (stopBtn)  stopBtn.style.display  = 'none';
+  if (ind)      ind.style.display      = 'none';
+}
+
+function applyScenario(s) {
+  // シナリオをシミュレーションタブに反映してStart
+  const lanesEl = document.getElementById('laneSliders');
+  if (lanesEl) {
+    ['EXPRESS','STANDARD','BULK','HIGH_VALUE','HTLC','GTID'].forEach(l => {
+      const el = document.getElementById(`ls-${l}`);
+      const lp = document.getElementById(`lp-${l}`);
+      const v = s.lanes[l] || 0;
+      if (el) el.value = v;
+      if (lp) lp.textContent = v;
+    });
+  }
+  const tpsEl = document.getElementById('simTps');
+  const tpsVal = document.getElementById('tpsVal');
+  if (tpsEl) tpsEl.value = s.tps;
+  if (tpsVal) tpsVal.textContent = s.tps;
+  simMaxTx = s.max;
+  // シミュレーションタブへ切り替え
+  document.getElementById('simSetupTab').style.display = 'none';
+  document.getElementById('simRunTab').style.display   = '';
+  document.getElementById('simScenarioTab').style.display = 'none';
+  document.querySelectorAll('#simNav button').forEach((b, i) => {
+    const active = i === 1;
+    b.className = `px-4 py-2 text-sm border-b-2 ${active ? 'border-brand-500 text-brand-600' : 'border-transparent text-gray-400 hover:text-gray-600'} transition-colors`;
+  });
+  toast(`シナリオ「${s.name}」適用 → Start を押してください`, 'info');
+}
+
+async function doSimSetup() {
+  const btn  = document.getElementById('simSetupBtn');
+  if (btn) btn.disabled = true;
+  const prog = document.getElementById('simSetupProgress');
+  const bar  = document.getElementById('simProgressBar');
+  const txt  = document.getElementById('simProgressText');
+  const log  = document.getElementById('simSetupLog');
+  if (prog) prog.style.display = '';
+  if (bar)  { bar.max = 100; bar.value = 0; }
+  simAccounts = [];
+
+  function addLog(msg) {
+    if (!log) return;
+    const d = document.createElement('div');
+    d.textContent = msg;
+    log.appendChild(d);
+    log.scrollTop = log.scrollHeight;
+  }
+  function setProgress(pct, msg) {
+    if (bar) bar.value = pct;
+    if (txt) txt.textContent = `${Math.round(pct)}% — ${msg}`;
+  }
+
+  const BANK_COUNT = 18;
+  const ACCOUNTS   = 200;
+  // ステップ数: seed(1) + 銀行18行(18) + 口座取得(1) = 20
+  const TOTAL_STEPS = 1 + BANK_COUNT + 1;
+
+  // Step 1: 全データリセット（2%）
+  addLog('[1/20] 全データリセット中...');
+  setProgress(2, 'リセット中...');
+  try {
+    const resp = await fetch(BASE + '/internal/seed', { method: 'POST', headers: { 'Content-Type': 'application/json', ...cronH() } });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    addLog('  [OK] リセット完了');
+  } catch(e) {
+    addLog('  [FAIL] リセット失敗: ' + e.message);
+    if (btn) btn.disabled = false;
+    return;
+  }
+
+  // Step 2–19: 銀行 003〜020 を1行ずつ作成（5%〜90%）
+  let totalAccounts = 0;
+  const failedBanks = [];
+  for (let i = 0; i < BANK_COUNT; i++) {
+    const pct = 5 + Math.round(i / BANK_COUNT * 80);
+    const bankCode = String(3 + i).padStart(3, '0');
+    addLog(`[${i+2}/${TOTAL_STEPS}] 銀行 ${bankCode} 初期化中...`);
+    setProgress(pct, `銀行 ${bankCode} 口座 ${ACCOUNTS} 件作成中...`);
+    try {
+      const resp = await fetch(BASE + '/internal/sim/setup-bank', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...cronH() },
+        body: JSON.stringify({ bank_index: i, accounts_per_bank: ACCOUNTS, personal_ratio: 0.9 }),
+      });
+      const r = await resp.json().catch(() => ({}));
+      if (!resp.ok || r.error) throw new Error(r.message || r.error || `HTTP ${resp.status}`);
+      totalAccounts += r.accounts_created ?? ACCOUNTS;
+      addLog(`  [OK] ${r.bank_name} (${r.bank_id}) — 口座 ${r.accounts_created} 件 (${r.elapsed_ms}ms)`);
+    } catch(e) {
+      addLog(`  [FAIL] 銀行 ${bankCode} エラー: ` + e.message);
+      failedBanks.push(bankCode);
+      // 失敗しても続行
+    }
+  }
+
+  if (failedBanks.length > 0) {
+    addLog(`\n[WARN] ${failedBanks.length}行の初期化に失敗しました: ${failedBanks.join(', ')}`);
+    addLog('これらの銀行の口座は使用できません');
+  }
+
+  // Step 20: 口座一覧を取得してシミュレーターに登録（92%→100%）
+  addLog(`[${TOTAL_STEPS}/${TOTAL_STEPS}] 口座一覧を取得中...`);
+  setProgress(92, '口座一覧取得中...');
+  try {
+    const allBanks = await api('GET', '/api/banks');
+    const bankList = allBanks.banks || [];
+    // 全銀行の口座取得を並列実行（no_balance=1 で残高計算をスキップ）
+    const results = await Promise.all(bankList.map(bank =>
+      api('GET', `/bank/${bank.bank_id}/v1/teller/accounts?no_balance=1`,
+        null, { 'X-Bank-Id': bank.bank_id, 'X-Teller-Id': 'TELLER-001' })
+        .then(accts => ({ bank, accts }))
+        .catch(() => ({ bank, accts: { accounts: [] } }))
+    ));
+    for (const { bank, accts } of results) {
+      for (const a of (accts.accounts || [])) {
+        if (a.account_type === 'SAVINGS' || a.account_type === 'CURRENT') {
+          simAccounts.push({ bankId: bank.bank_id, accountId: a.account_id, customerId: a.customer_id, name: a.customer_name });
+        }
+      }
+    }
+    addLog(`  [OK] ${simAccounts.length} 口座を送金エンジンに登録`);
+  } catch(e) { addLog('  [FAIL] 口座一覧取得: ' + e.message); }
+
+  setProgress(100, '初期化完了');
+  const summaryEl = document.getElementById('simSetupSummary');
+  if (summaryEl) summaryEl.innerHTML = `
+    <div class="bg-emerald-50 border border-emerald-200 rounded p-4 text-sm">
+      <div class="font-medium text-emerald-700">初期化完了</div>
+      <div class="text-emerald-600 mt-1">銀行: ${BANK_COUNT}行 / 口座: ${totalAccounts}件 / 送金エンジン登録: ${simAccounts.length}件</div>
+      ${failedBanks.length > 0 ? `<div class="text-amber-600 mt-1"><i class="fa-solid fa-triangle-exclamation"></i> ${failedBanks.length}行の初期化に失敗</div>` : ''}
+    </div>`;
+  if (btn) btn.disabled = false;
+  toast('大規模初期化完了', 'success');
+  await loadBanks();
+}
+
+// ========== 既存口座でシミュレーション開始 ==========
+async function doSimSetupFromExisting() {
+  const btn = document.getElementById('simSetupFromExistingBtn');
+  if (btn) btn.disabled = true;
+  const prog = document.getElementById('simSetupProgress');
+  const bar = document.getElementById('simProgressBar');
+  const txt = document.getElementById('simProgressText');
+  const log = document.getElementById('simSetupLog');
+  if (prog) prog.style.display = '';
+  if (bar) { bar.max = 100; bar.value = 0; }
+  simAccounts = [];
+
+  function addLog(msg) {
+    if (!log) return;
+    const d = document.createElement('div');
+    d.textContent = msg;
+    log.appendChild(d);
+    log.scrollTop = log.scrollHeight;
+  }
+  function setProgress(pct, msg) {
+    if (bar) bar.value = pct;
+    if (txt) txt.textContent = `${Math.round(pct)}% — ${msg}`;
+  }
+
+  setProgress(10, '既存口座を取得中...');
+  addLog('[1/2] 既存口座を取得中...');
+  try {
+    const allBanks = await api('GET', '/api/banks');
+    if (!allBanks.banks || allBanks.banks.length === 0) {
+      addLog('  [FAIL] 銀行が登録されていません');
+      if (btn) btn.disabled = false;
+      return;
+    }
+
+    let bankCount = 0;
+    let acctCount = 0;
+    // 全銀行の口座取得を並列実行（no_balance=1 で残高計算をスキップ）
+    const fetchResults = await Promise.all(allBanks.banks.map(bank =>
+      api('GET', `/bank/${bank.bank_id}/v1/teller/accounts?no_balance=1`,
+        null, { 'X-Bank-Id': bank.bank_id, 'X-Teller-Id': 'TELLER-001' })
+        .then(accts => ({ bank, accts }))
+        .catch(e => {
+          console.warn(`[sim] 銀行 ${bank.bank_id} の口座取得失敗:`, e.message);
+          return { bank, accts: { accounts: [] } };
+        })
+    ));
+    for (const { bank, accts } of fetchResults) {
+      const savingsAccounts = (accts.accounts || []).filter(a =>
+        a.account_type === 'SAVINGS' || a.account_type === 'CURRENT'
+      );
+      for (const a of savingsAccounts) {
+        simAccounts.push({ bankId: bank.bank_id, accountId: a.account_id, customerId: a.customer_id, name: a.customer_name });
+        acctCount++;
+      }
+      if (savingsAccounts.length > 0) {
+        bankCount++;
+      }
+    }
+
+    if (simAccounts.length === 0) {
+      addLog('  [FAIL] 取得できた口座がありません');
+      if (btn) btn.disabled = false;
+      return;
+    }
+
+    addLog(`  [OK] ${bankCount}行 から ${acctCount}件の口座を取得`);
+    setProgress(50, '口座を検証中...');
+
+    // 最小口座数チェック
+    if (simAccounts.length < 2) {
+      addLog('  [WARN] 警告: 送受金ペアを作成するには最低2口座が必要です');
+    }
+
+    setProgress(100, '準備完了');
+    const summaryEl = document.getElementById('simSetupSummary');
+    if (summaryEl) summaryEl.innerHTML = `
+      <div class="bg-blue-50 border border-blue-200 rounded p-4 text-sm">
+        <div class="font-medium text-blue-700">既存口座で準備完了</div>
+        <div class="text-blue-600 mt-1">銀行: ${bankCount}行 / 口座: ${acctCount}件</div>
+      </div>`;
+    if (btn) btn.disabled = false;
+    toast(`既存口座でシミュレーション準備完了 (${acctCount}件)`, 'success');
+  } catch (e) {
+    addLog('  [FAIL] エラー: ' + e.message);
+    if (btn) btn.disabled = false;
+    toast('既存口座取得に失敗しました', 'error');
+  }
+}
+
+// ========== TX Timeline Modal ==========
+async function showTxTimeline(txid) {
+  const modal = document.getElementById('txModal');
+  const modalId = document.getElementById('txModalId');
+  const modalMeta = document.getElementById('txModalMeta');
+  const timeline = document.getElementById('txModalTimeline');
+  if (!modal) return;
+  modalId.textContent = txid;
+  modalMeta.innerHTML = '<div class="text-gray-300 text-xs col-span-4">読み込み中...</div>';
+  timeline.innerHTML = '<div class="text-gray-400 text-sm py-4 text-center">イベントを取得中...</div>';
+  const theaterLink = document.getElementById('txModalTheaterLink');
+  if (theaterLink) theaterLink.href = `/theater?txid=${encodeURIComponent(txid)}`;
+  modal.classList.remove('hidden');
+
+  try {
+    const [txRes, evRes] = await Promise.all([
+      api('GET', `/api/transactions/${txid}`),
+      api('GET', `/api/transactions/${txid}/events`),
+    ]);
+    const tx = txRes.transaction || txRes || {};
+    const events = evRes.events || [];
+    const isBad = tx.state === 'SUSPENDED' || tx.state === 'CANCELLED' || tx.state === 'FAIL_DEBIT' || tx.state === 'FAIL_CREDIT';
+    modalMeta.innerHTML = `
+      <div><div class="text-[10px] text-gray-400 uppercase tracking-wider">状態</div><div class="mt-1">${badge(tx.state || '-')}</div></div>
+      <div><div class="text-[10px] text-gray-400 uppercase tracking-wider">レーン</div><div class="mt-1 text-sm font-medium">${tx.lane || '-'}</div></div>
+      <div><div class="text-[10px] text-gray-400 uppercase tracking-wider">金額</div><div class="mt-1 text-sm font-medium">${tx.amount_value ? fmtAmt(tx.amount_value) : '-'}</div></div>
+      <div><div class="text-[10px] text-gray-400 uppercase tracking-wider">作成日時</div><div class="mt-1 text-[11px] text-gray-600">${fmtDate(tx.created_at)}</div></div>
+    `;
+    if (isBad && tx.reason_code) {
+      modalMeta.insertAdjacentHTML('beforeend', `
+        <div class="col-span-4 bg-red-50 border border-red-200 rounded-lg px-4 py-3">
+          <div class="text-[11px] text-red-600 font-semibold uppercase tracking-wider mb-1">停止・失敗理由</div>
+          <div class="text-sm text-red-700 font-medium">${tx.reason_code}</div>
+        </div>`);
+    }
+    if (!events.length) {
+      timeline.innerHTML = '<div class="text-gray-400 text-sm py-8 text-center">イベントログがありません（非同期処理待ちか、古い取引の可能性があります）</div>';
+    } else {
+      const statusIcon = s => s === 'OK' ? '<i class="fa-solid fa-check"></i>' : s === 'FAILED' ? '<i class="fa-solid fa-xmark"></i>' : '<i class="fa-solid fa-circle text-[8px]"></i>';
+      const statusCls  = s => s === 'OK' ? 'text-emerald-600 bg-emerald-50 border-emerald-200' : s === 'FAILED' ? 'text-red-600 bg-red-50 border-red-200' : 'text-amber-600 bg-amber-50 border-amber-200';
+      timeline.innerHTML = events.map((ev, i) => `
+        <div class="flex gap-3 fade-in" style="animation-delay:${i*30}ms">
+          <div class="flex flex-col items-center flex-shrink-0">
+            <div class="w-7 h-7 rounded-full border-2 flex items-center justify-center text-sm font-bold ${statusCls(ev.status)}">${statusIcon(ev.status)}</div>
+            ${i < events.length-1 ? '<div class="w-0.5 flex-1 bg-gray-200 mt-1"></div>' : ''}
+          </div>
+          <div class="flex-1 pb-4">
+            <div class="flex items-start justify-between gap-2">
+              <div>
+                <span class="text-sm font-medium text-gray-800">${ev.action || ev.event_type || '-'}</span>
+                ${ev.actor ? `<span class="ml-2 text-[10px] text-gray-400 bg-gray-100 rounded px-1.5 py-0.5">${ev.actor}</span>` : ''}
+                ${ev.source === 'FINALITY' ? `<span class="ml-1 text-[9px] text-blue-500 bg-blue-50 border border-blue-100 rounded px-1 py-0.5">状態遷移</span>` : ''}
+              </div>
+              <div class="text-right flex-shrink-0">
+                <div class="text-[11px] text-gray-400">${fmtDate(ev.created_at)}</div>
+                ${ev.duration_ms !== null && ev.duration_ms !== undefined ? `<div class="text-[10px] text-gray-300">${ev.duration_ms}ms</div>` : ''}
+              </div>
+            </div>
+            ${ev.state_to ? `<div class="mt-0.5 flex items-center gap-1 text-[11px]">
+              ${ev.state_from ? `<span class="text-gray-400 font-mono">${ev.state_from}</span><span class="text-gray-300 mx-0.5">→</span>` : ''}
+              <span class="font-semibold font-mono text-brand-600">${ev.state_to}</span>
+            </div>` : ''}
+            ${ev.reason_code ? `<div class="mt-1 inline-flex items-center gap-1 bg-red-50 border border-red-200 rounded px-2 py-0.5">
+              <span class="text-[10px] text-red-500 font-semibold uppercase">${ev.reason_code}</span>
+            </div>` : ''}
+            ${ev.detail ? `<div class="mt-1 text-[11px] text-gray-500 font-mono break-all">${ev.detail}</div>` : ''}
+          </div>
+        </div>
+      `).join('');
+    }
+  } catch(e) {
+    timeline.innerHTML = `<div class="text-red-500 text-sm py-4">取得エラー: ${e.message}</div>`;
+  }
+}
+function closeTxModal() { document.getElementById('txModal')?.classList.add('hidden'); }
+
+// ========== Cases Page ==========
+async function renderCases() {
+  const app = document.getElementById('app');
+  app.innerHTML = `
+    <div class="mb-4 flex items-center gap-3">
+      ${subnav('caseNav', [
+        {key:'all', label:'全ケース'},
+        {key:'SUSPENDED', label:'SUSPENDED'},
+        {key:'CANCELLED', label:'CANCELLED'},
+        {key:'FAIL_DEBIT', label:'FAIL_DEBIT'},
+        {key:'FAIL_CREDIT', label:'FAIL_CREDIT'},
+      ])}
+    </div>
+    <div id="caseContent"></div>
+  `;
+  bindSubnav('caseNav', tab => loadCasesFiltered(tab));
+  loadCasesFiltered('all');
+}
+
+async function loadCasesFiltered(filter) {
+  const el = document.getElementById('caseContent');
+  if (!el) return;
+  el.innerHTML = '<div class="text-center py-8 text-gray-400 text-sm">読み込み中...</div>';
+  const txRes = await api('GET', '/api/transactions?limit=200');
+  const all = txRes.transactions || [];
+  const problemStates = ['SUSPENDED', 'CANCELLED', 'FAIL_DEBIT', 'FAIL_CREDIT'];
+  let txs = filter === 'all' ? all.filter(t => problemStates.includes(t.state)) : all.filter(t => t.state === filter);
+  if (!txs.length) {
+    el.innerHTML = '<div class="bg-white rounded-lg border border-gray-200 p-8 text-center text-gray-400 text-sm">該当するケースはありません <i class="fa-solid fa-check text-emerald-400"></i></div>';
+    return;
+  }
+  el.innerHTML = txs.map(t => {
+    const stateColor = t.state === 'SUSPENDED' ? 'border-l-amber-400' : 'border-l-red-400';
+    return `<div class="bg-white rounded-lg border border-gray-200 border-l-4 ${stateColor} p-5 mb-3 hover:shadow-md transition-shadow cursor-pointer fade-in" onclick="showTxTimeline('${t.txid}')">
+      <div class="flex items-start justify-between gap-4">
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2 flex-wrap">
+            ${badge(t.state)}
+            <span class="text-xs bg-gray-100 text-gray-600 rounded px-1.5 py-0.5">${t.lane}</span>
+            <span class="mono text-[11px] text-gray-400">${t.txid}</span>
+          </div>
+          <div class="mt-2 grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-1">
+            <div><div class="text-[10px] text-gray-400">金額</div><div class="text-sm font-medium">${fmtAmt(t.amount_value)}</div></div>
+            <div><div class="text-[10px] text-gray-400">仕向</div><div class="text-[11px] font-mono">${t.payer_account_hash || bankName(t.payer_bank_id)}</div></div>
+            <div><div class="text-[10px] text-gray-400">被仕向</div><div class="text-[11px] font-mono">${t.payee_account_hash || bankName(t.payee_bank_id)}</div></div>
+            <div><div class="text-[10px] text-gray-400">発生日時</div><div class="text-[11px]">${fmtDate(t.created_at)}</div></div>
+          </div>
+          ${t.reason_code ? `<div class="mt-2 inline-flex items-center gap-1.5 bg-red-50 border border-red-200 rounded px-2.5 py-1">
+            <span class="text-[10px] text-red-500 font-semibold uppercase tracking-wider">理由:</span>
+            <span class="text-[12px] text-red-700 font-medium">${t.reason_code}</span>
+          </div>` : ''}
+        </div>
+        <div class="flex-shrink-0 text-xs text-brand-500 font-medium hover:underline">トレース →</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ========== Trace Page ==========
+async function renderTrace() {
+  const app = document.getElementById('app');
+  app.innerHTML = `
+    <div class="mb-4 flex items-center justify-between">
+      <div class="text-xs text-gray-400">直近のイベントログ（全取引）</div>
+      <button onclick="renderTrace()" class="text-xs text-gray-400 hover:text-gray-600 px-3 py-1 rounded border border-gray-200"><i class="fa-solid fa-arrows-rotate"></i> 更新</button>
+    </div>
+    <div id="traceContent"></div>
+  `;
+  await loadTraceEvents();
+}
+
+async function loadTraceEvents() {
+  const el = document.getElementById('traceContent');
+  if (!el) return;
+  el.innerHTML = '<div class="text-center py-8 text-gray-400 text-sm">読み込み中...</div>';
+  try {
+    const r = await api('GET', '/api/events?limit=100');
+    const events = r.events || [];
+    if (!events.length) {
+      el.innerHTML = '<div class="bg-white rounded-lg border border-gray-200 p-8 text-center text-gray-400 text-sm">イベントログがありません</div>';
+      return;
+    }
+    const statusCls = s => s === 'OK' ? 'bg-emerald-100 text-emerald-700' : s === 'FAILED' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700';
+    el.innerHTML = `<div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
+      <table class="w-full text-sm">
+        <thead><tr class="border-b border-gray-200 text-left bg-gray-50">
+          <th class="px-4 py-2.5 text-xs text-gray-400 font-medium">日時</th>
+          <th class="px-4 py-2.5 text-xs text-gray-400 font-medium">取引ID</th>
+          <th class="px-4 py-2.5 text-xs text-gray-400 font-medium">アクター</th>
+          <th class="px-4 py-2.5 text-xs text-gray-400 font-medium">アクション</th>
+          <th class="px-4 py-2.5 text-xs text-gray-400 font-medium">結果</th>
+          <th class="px-4 py-2.5 text-xs text-gray-400 font-medium">理由コード</th>
+          <th class="px-4 py-2.5 text-xs text-gray-400 font-medium text-right">処理時間</th>
+        </tr></thead>
+        <tbody class="divide-y divide-gray-100">${events.map(ev => `
+          <tr class="hover:bg-gray-50 cursor-pointer" onclick="showTxTimeline('${ev.txid}')">
+            <td class="px-4 py-2 text-[11px] text-gray-400 whitespace-nowrap">${fmtDate(ev.created_at)}</td>
+            <td class="px-4 py-2 mono text-[11px] text-blue-600 hover:underline">${ev.txid ? ev.txid.slice(0,20)+'…' : '-'}</td>
+            <td class="px-4 py-2 text-[11px]"><span class="bg-gray-100 text-gray-600 rounded px-1.5 py-0.5">${ev.actor || '-'}</span></td>
+            <td class="px-4 py-2 text-[12px] font-medium">${ev.action || ev.event_type || '-'}</td>
+            <td class="px-4 py-2"><span class="inline-block rounded-full px-2 py-0.5 text-[11px] font-medium ${statusCls(ev.status)}">${ev.status || '-'}</span></td>
+            <td class="px-4 py-2 text-[11px] ${ev.reason_code ? 'text-red-600 font-medium' : 'text-gray-300'}">${ev.reason_code || '-'}</td>
+            <td class="px-4 py-2 text-[11px] text-gray-400 text-right whitespace-nowrap">${ev.duration_ms !== null && ev.duration_ms !== undefined ? ev.duration_ms+'ms' : '-'}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`;
+  } catch(e) {
+    el.innerHTML = `<div class="text-red-500 text-sm p-4">取得エラー: ${e.message}</div>`;
+  }
+}
+
+// ========== Account Verification ==========
+async function renderAcctVerify() {
+  document.getElementById('app').innerHTML = card('事前口座確認', `
+    ${subnav('avNav', [{key:'single',label:'単件照会'},{key:'batch',label:'一括照会'},{key:'history',label:'照会履歴'}])}
+    <div id="avTab"></div>
+  `) + '<div id="avResult"></div>';
+  bindSubnav('avNav', renderAvTab);
+  renderAvTab('single');
+}
+function renderAvTab(tab) {
+  const el = document.getElementById('avTab');
+  if (tab === 'single') {
+    el.innerHTML = `<div class="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl">
+      <div><label class="block text-xs text-gray-400 mb-1">口座番号（10桁）</label>
+        <input type="text" id="avAcct" maxlength="10" placeholder="例: 0020000001" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm font-mono focus:ring-1 focus:ring-brand-500 focus:border-brand-500"></div>
+      <div><label class="block text-xs text-gray-400 mb-1">照会名義</label>
+        <input type="text" id="avName" placeholder="名義人名を入力" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-1 focus:ring-brand-500 focus:border-brand-500"></div>
+    </div>
+    <button class="mt-4 bg-brand-500 hover:bg-brand-600 text-white px-5 py-2 rounded-md text-sm transition-colors" onclick="doAcctVerify()"><i class="fa-solid fa-user-check mr-1"></i> 照会実行</button>`;
+  } else if (tab === 'batch') {
+    el.innerHTML = `<div class="max-w-2xl">
+      <p class="text-xs text-gray-400 mb-3">複数口座を改行区切りで入力（形式: 口座番号,名義人名）</p>
+      <textarea id="avBatch" rows="6" placeholder="0020000001,田中太郎&#10;0010000002,佐藤花子" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm font-mono focus:ring-1 focus:ring-brand-500 focus:border-brand-500"></textarea>
+      <button class="mt-3 bg-brand-500 hover:bg-brand-600 text-white px-5 py-2 rounded-md text-sm transition-colors" onclick="doBatchVerify()"><i class="fa-solid fa-list-check mr-1"></i> 一括照会</button>
+    </div>`;
+  } else {
+    el.innerHTML = '<div id="avHistory" class="text-sm text-gray-400">読込中...</div>';
+    loadAvHistory();
+  }
+}
+async function doAcctVerify() {
+  const acct = document.getElementById('avAcct')?.value.trim();
+  const name = document.getElementById('avName')?.value.trim();
+  if (!acct || acct.length !== 10) { toast('口座番号を10桁で入力してください', 'error'); return; }
+  if (!name) { toast('照会名義を入力してください', 'error'); return; }
+  try {
+    const verificationId = uuid();
+    const targetBankId = acct.slice(0, 3);
+    await api('POST', '/api/account-verify', { target_account_id: acct, name_to_verify: name, verification_id: verificationId, target_bank_id: targetBankId, idempotency_key: uuid() });
+    const r = await api('GET', `/api/account-verify/${verificationId}`);
+    const st = r.status || r.result;
+    const matchCls = st === 'MATCHED' ? 'text-emerald-600' : st === 'UNMATCHED' ? 'text-amber-600' : 'text-red-600';
+    document.getElementById('avResult').innerHTML = card('照会結果', `
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div><div class="text-[10px] text-gray-400">口座番号</div><div class="mono text-sm">${acct}</div></div>
+        <div><div class="text-[10px] text-gray-400">照会名義</div><div class="text-sm">${name}</div></div>
+        <div><div class="text-[10px] text-gray-400">結果</div><div class="text-sm font-semibold ${matchCls}">${st}</div></div>
+        <div><div class="text-[10px] text-gray-400">一致スコア</div><div class="text-sm">${r.match_score !== undefined ? (r.match_score * 100).toFixed(0) + '%' : '-'}</div></div>
+      </div>
+      ${r.target_account_name ? `<div class="mt-3 text-xs text-gray-500">登録名義: <span class="font-medium">${r.target_account_name}</span></div>` : ''}
+      ${r.fraud_warning ? `<div class="mt-2 bg-red-50 border border-red-200 rounded p-2 text-xs text-red-600"><i class="fa-solid fa-shield-halved mr-1"></i> フロード警告あり</div>` : ''}
+    `);
+    toast('口座確認完了', 'success');
+  } catch(e) { toast('照会エラー: ' + e.message, 'error'); }
+}
+async function doBatchVerify() {
+  const text = document.getElementById('avBatch')?.value.trim();
+  if (!text) { toast('口座情報を入力してください', 'error'); return; }
+  const items = text.split('\n').filter(l => l.trim()).map(l => { const [a, n] = l.split(','); const acctId = a?.trim(); return { target_account_id: acctId, target_bank_id: acctId?.slice(0, 3), name_to_verify: n?.trim() || undefined }; });
+  try {
+    const results = await api('POST', '/api/account-verify/batch', { batch_id: uuid(), items, idempotency_key: uuid() });
+    document.getElementById('avResult').innerHTML = card(`一括照会結果 (${results.length}件)`, `
+      <div class="overflow-x-auto"><table class="w-full text-sm"><thead><tr class="border-b border-gray-200 text-left">
+        <th class="pb-2 text-xs text-gray-400 font-medium">口座番号</th>
+        <th class="pb-2 text-xs text-gray-400 font-medium">照会名義</th>
+        <th class="pb-2 text-xs text-gray-400 font-medium">結果</th>
+        <th class="pb-2 text-xs text-gray-400 font-medium">照会ID</th>
+      </tr></thead><tbody class="divide-y divide-gray-100">${results.map((r, i) => `<tr class="hover:bg-gray-50">
+        <td class="py-2 mono text-[11px]">${items[i]?.target_account_id||'-'}</td>
+        <td class="py-2 text-xs">${items[i]?.name_to_verify||'-'}</td>
+        <td class="py-2">${badge(r.status||'-')}</td>
+        <td class="py-2 mono text-[10px] text-gray-400">${r.verification_id||'-'}</td>
+      </tr>`).join('')}</tbody></table></div>`);
+    toast('一括照会完了', 'success');
+  } catch(e) { toast('一括照会エラー: ' + e.message, 'error'); }
+}
+async function loadAvHistory() {
+  const el = document.getElementById('avHistory');
+  if (!el) return;
+  // Use transactions to show recent verifications (or show "no data" if API not available)
+  el.innerHTML = '<p class="text-gray-400 py-4 text-xs">照会履歴APIは個別の照会結果から参照できます</p>';
+}
+
+// ========== Proxy Directory ==========
+async function renderProxy() {
+  document.getElementById('app').innerHTML = card('Proxyディレクトリ', `
+    ${subnav('proxyNav', [{key:'register',label:'登録'},{key:'resolve',label:'解決'},{key:'list',label:'一覧'}])}
+    <div id="proxyTab"></div>
+  `) + '<div id="proxyResult"></div>';
+  bindSubnav('proxyNav', renderProxyTab);
+  renderProxyTab('register');
+}
+function renderProxyTab(tab) {
+  const el = document.getElementById('proxyTab');
+  if (tab === 'register') {
+    el.innerHTML = `<div class="max-w-lg space-y-3">
+      <div><label class="block text-xs text-gray-400 mb-1">エイリアス種別</label>
+        <select id="proxyType" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm">
+          <option value="PHONE">電話番号</option><option value="EMAIL">メールアドレス</option><option value="NATIONAL_ID">マイナンバー</option>
+        </select></div>
+      <div><label class="block text-xs text-gray-400 mb-1">エイリアス値</label>
+        <input type="text" id="proxyAlias" placeholder="例: 090-1234-5678" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-1 focus:ring-brand-500 focus:border-brand-500"></div>
+      <div><label class="block text-xs text-gray-400 mb-1">紐付け口座番号（10桁）</label>
+        <input type="text" id="proxyAcct" maxlength="10" placeholder="例: 0010000001" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm font-mono focus:ring-1 focus:ring-brand-500 focus:border-brand-500"></div>
+      <button class="bg-brand-500 hover:bg-brand-600 text-white px-5 py-2 rounded-md text-sm transition-colors" onclick="doProxyRegister()"><i class="fa-solid fa-plus mr-1"></i> 登録</button>
+    </div>`;
+  } else if (tab === 'resolve') {
+    el.innerHTML = `<div class="max-w-lg space-y-3">
+      <div><label class="block text-xs text-gray-400 mb-1">エイリアス種別</label>
+        <select id="proxyResType" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm">
+          <option value="PHONE">電話番号</option><option value="EMAIL">メールアドレス</option><option value="NATIONAL_ID">マイナンバー</option>
+        </select></div>
+      <div><label class="block text-xs text-gray-400 mb-1">エイリアス値</label>
+        <input type="text" id="proxyResAlias" placeholder="例: 090-1234-5678" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-1 focus:ring-brand-500 focus:border-brand-500"></div>
+      <button class="bg-brand-500 hover:bg-brand-600 text-white px-5 py-2 rounded-md text-sm transition-colors" onclick="doProxyResolve()"><i class="fa-solid fa-magnifying-glass mr-1"></i> 解決</button>
+    </div>`;
+  } else {
+    el.innerHTML = '<p class="text-xs text-gray-400 py-4">Proxy一覧はResolve APIで個別に照会してください</p>';
+  }
+}
+async function doProxyRegister() {
+  const type = document.getElementById('proxyType').value;
+  const alias = document.getElementById('proxyAlias').value.trim();
+  const acct = document.getElementById('proxyAcct').value.trim();
+  if (!alias) { toast('エイリアス値を入力してください', 'error'); return; }
+  if (!acct || acct.length !== 10) { toast('口座番号を10桁で入力してください', 'error'); return; }
+  try {
+    const r = await api('POST', '/api/proxy/register', { proxy_type: type, proxy_value: alias, bank_id: acct.slice(0,3), account_id: acct, idempotency_key: uuid() });
+    document.getElementById('proxyResult').innerHTML = card('Proxy登録結果', `
+      <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
+        <dt class="text-gray-400">Proxy ID</dt><dd class="mono">${r.proxy_id||'-'}</dd>
+        <dt class="text-gray-400">種別</dt><dd>${type}</dd>
+        <dt class="text-gray-400">値</dt><dd>${alias}</dd>
+        <dt class="text-gray-400">紐付け口座</dt><dd class="mono">${acct}</dd>
+      </dl>`);
+    toast('Proxy登録完了', 'success');
+  } catch(e) { toast('登録エラー: ' + e.message, 'error'); }
+}
+async function doProxyResolve() {
+  const type = document.getElementById('proxyResType').value;
+  const alias = document.getElementById('proxyResAlias').value.trim();
+  if (!alias) { toast('エイリアス値を入力してください', 'error'); return; }
+  try {
+    const r = await api('GET', `/api/proxy/resolve?proxy_type=${type}&proxy_value=${encodeURIComponent(alias)}`);
+    if (r.error || !r.account_id) {
+      document.getElementById('proxyResult').innerHTML = card('解決結果', `<div class="text-red-500 text-sm"><i class="fa-solid fa-xmark mr-1"></i> 該当なし: ${r.error||'登録されていません'}</div>`);
+    } else {
+      document.getElementById('proxyResult').innerHTML = card('解決結果', `
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div><div class="text-[10px] text-gray-400">種別</div><div class="text-sm">${type}</div></div>
+          <div><div class="text-[10px] text-gray-400">エイリアス</div><div class="text-sm">${alias}</div></div>
+          <div><div class="text-[10px] text-gray-400">銀行</div><div class="text-sm">${bankName(r.bank_id)}</div></div>
+          <div><div class="text-[10px] text-gray-400">口座番号</div><div class="mono text-sm">${r.account_id}</div></div>
+        </div>`);
+    }
+    toast('Proxy解決完了', 'success');
+  } catch(e) { toast('解決エラー: ' + e.message, 'error'); }
+}
+
+// ========== FX 外貨両替 (cross-currency) ==========
+const FX_RATE_SCALE = 100000000; // 1e8 — must match src/zc/fx/rates.ts RATE_SCALE
+function fxCcyInput(id, ph) {
+  return `<input type="text" id="${id}" maxlength="3" placeholder="${ph}" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm uppercase font-mono focus:ring-1 focus:ring-brand-500 focus:border-brand-500">`;
+}
+async function renderFx() {
+  document.getElementById('app').innerHTML = card('FX 外貨両替（マルチカレンシー）', `
+    <p class="text-xs text-gray-400 mb-4">FXプロバイダ（FXP）のレート提示、最良経路の価格照会、外貨送金（GTID）のステータス照会を行います。</p>
+    ${subnav('fxNav', [{key:'rates',label:'レート提示'},{key:'quote',label:'価格照会'},{key:'status',label:'送金ステータス'}])}
+    <div id="fxTab"></div>
+  `) + '<div id="fxResult" class="mt-4"></div>';
+  bindSubnav('fxNav', renderFxTab);
+  renderFxTab('rates');
+}
+function renderFxTab(tab) {
+  const el = document.getElementById('fxTab');
+  document.getElementById('fxResult').innerHTML = '';
+  if (tab === 'rates') {
+    const fxpOpts = banks.map(b => `<option value="${b.bank_id}">${esc(b.bank_name)} (${b.bank_id})</option>`).join('');
+    el.innerHTML = `<div class="grid md:grid-cols-2 gap-6">
+      <div class="space-y-3">
+        <h4 class="text-sm font-medium text-gray-600"><i class="fa-solid fa-tag mr-1 text-gray-400"></i>レート提示（PUT）</h4>
+        <div><label class="block text-xs text-gray-400 mb-1">FXプロバイダ銀行</label>
+          <select id="fxRateFxp" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm">${fxpOpts}</select></div>
+        <div class="grid grid-cols-2 gap-3">
+          <div><label class="block text-xs text-gray-400 mb-1">from通貨</label>${fxCcyInput('fxRateFrom','JPY')}</div>
+          <div><label class="block text-xs text-gray-400 mb-1">to通貨</label>${fxCcyInput('fxRateTo','USD')}</div>
+        </div>
+        <div><label class="block text-xs text-gray-400 mb-1">レート（to÷from、例 JPY→USD = 0.0067）</label>
+          <input type="number" step="any" id="fxRateVal" placeholder="0.0067" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm font-mono focus:ring-1 focus:ring-brand-500 focus:border-brand-500"></div>
+        <div class="grid grid-cols-2 gap-3">
+          <div><label class="block text-xs text-gray-400 mb-1">最小額（from、整数）</label>
+            <input type="number" id="fxRateMin" placeholder="0" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm font-mono"></div>
+          <div><label class="block text-xs text-gray-400 mb-1">最大額（from、空=無制限）</label>
+            <input type="number" id="fxRateMax" placeholder="" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm font-mono"></div>
+        </div>
+        <div><label class="block text-xs text-gray-400 mb-1">有効期限（valid_to）</label>
+          <input type="datetime-local" id="fxRateValidTo" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"></div>
+        <button class="bg-brand-500 hover:bg-brand-600 text-white px-5 py-2 rounded-md text-sm transition-colors" onclick="doFxPutRate()"><i class="fa-solid fa-paper-plane mr-1"></i> レート提示</button>
+        <p class="text-[10px] text-gray-400">※ 提示にはFXP登録済み（is_fx_provider）の銀行が必要です。</p>
+      </div>
+      <div class="space-y-3">
+        <h4 class="text-sm font-medium text-gray-600"><i class="fa-solid fa-list mr-1 text-gray-400"></i>提示レート一覧</h4>
+        <div class="grid grid-cols-2 gap-3">
+          <div><label class="block text-xs text-gray-400 mb-1">from通貨</label>${fxCcyInput('fxListFrom','JPY')}</div>
+          <div><label class="block text-xs text-gray-400 mb-1">to通貨</label>${fxCcyInput('fxListTo','USD')}</div>
+        </div>
+        <button class="border border-gray-300 hover:bg-gray-50 px-5 py-2 rounded-md text-sm transition-colors" onclick="doFxListRates()"><i class="fa-solid fa-magnifying-glass mr-1"></i> 一覧取得</button>
+        <div id="fxRatesList" class="text-xs text-gray-400">通貨ペアを指定して取得してください。</div>
+      </div>
+    </div>`;
+  } else if (tab === 'quote') {
+    el.innerHTML = `<div class="max-w-lg space-y-3">
+      <h4 class="text-sm font-medium text-gray-600"><i class="fa-solid fa-route mr-1 text-gray-400"></i>最良経路の価格照会（コミットなし）</h4>
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class="block text-xs text-gray-400 mb-1">from通貨</label>${fxCcyInput('fxQFrom','JPY')}</div>
+        <div><label class="block text-xs text-gray-400 mb-1">to通貨</label>${fxCcyInput('fxQTo','USD')}</div>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class="block text-xs text-gray-400 mb-1">金額（整数・最小単位）</label>
+          <input type="number" id="fxQAmount" placeholder="1000000" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm font-mono"></div>
+        <div><label class="block text-xs text-gray-400 mb-1">建値</label>
+          <select id="fxQDenom" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm">
+            <option value="PAYER">PAYER（支払額固定）</option><option value="PAYEE">PAYEE（受取額固定）</option>
+          </select></div>
+      </div>
+      <div><label class="block text-xs text-gray-400 mb-1">中継ホップ上限</label>
+        <input type="number" id="fxQHops" value="1" min="0" max="2" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm font-mono"></div>
+      <button class="bg-brand-500 hover:bg-brand-600 text-white px-5 py-2 rounded-md text-sm transition-colors" onclick="doFxQuote()"><i class="fa-solid fa-calculator mr-1"></i> 価格照会</button>
+    </div>`;
+  } else {
+    el.innerHTML = `<div class="max-w-lg space-y-3">
+      <h4 class="text-sm font-medium text-gray-600"><i class="fa-solid fa-magnifying-glass-chart mr-1 text-gray-400"></i>外貨送金ステータス照会</h4>
+      <div><label class="block text-xs text-gray-400 mb-1">GTID（GT-...）</label>
+        <input type="text" id="fxStatusGtid" placeholder="GT-xxxxxxxx" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm font-mono focus:ring-1 focus:ring-brand-500 focus:border-brand-500"></div>
+      <button class="bg-brand-500 hover:bg-brand-600 text-white px-5 py-2 rounded-md text-sm transition-colors" onclick="doFxStatus()"><i class="fa-solid fa-magnifying-glass mr-1"></i> 照会</button>
+    </div>`;
+  }
+}
+function fxRateHuman(scaled) { return (Number(scaled) / FX_RATE_SCALE).toPrecision(8).replace(/\.?0+$/, ''); }
+async function doFxPutRate() {
+  const fxp = document.getElementById('fxRateFxp').value;
+  const from = document.getElementById('fxRateFrom').value.trim().toUpperCase();
+  const to = document.getElementById('fxRateTo').value.trim().toUpperCase();
+  const human = parseFloat(document.getElementById('fxRateVal').value);
+  const validToLocal = document.getElementById('fxRateValidTo').value;
+  if (!/^[A-Z]{3}$/.test(from) || !/^[A-Z]{3}$/.test(to)) { toast('通貨はISO 4217の3文字で入力してください', 'error'); return; }
+  if (from === to) { toast('from/to通貨は異なる必要があります', 'error'); return; }
+  if (!(human > 0)) { toast('レートを正の数で入力してください', 'error'); return; }
+  if (!validToLocal) { toast('有効期限を入力してください', 'error'); return; }
+  const minV = document.getElementById('fxRateMin').value;
+  const maxV = document.getElementById('fxRateMax').value;
+  const body = {
+    fxp_bank_id: fxp, from_currency: from, to_currency: to,
+    rate: Math.round(human * FX_RATE_SCALE),
+    valid_to: new Date(validToLocal).toISOString(),
+  };
+  if (minV !== '') body.min_amount = parseInt(minV, 10);
+  if (maxV !== '') body.max_amount = parseInt(maxV, 10);
+  try {
+    const r = await api('PUT', '/api/fx/rates', body);
+    if (r.error) { toast('提示エラー: ' + (r.reason_code || r.error), 'error'); return; }
+    const q = r.quote || {};
+    document.getElementById('fxResult').innerHTML = card('レート提示結果', `
+      <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
+        <dt class="text-gray-400">結果</dt><dd>${r.result || '-'}</dd>
+        <dt class="text-gray-400">Quote ID</dt><dd class="mono">${q.quote_id || '-'}</dd>
+        <dt class="text-gray-400">ペア</dt><dd>${from} → ${to}</dd>
+        <dt class="text-gray-400">レート</dt><dd class="mono">${fxRateHuman(q.rate ?? body.rate)} (scaled ${q.rate ?? body.rate})</dd>
+        <dt class="text-gray-400">有効期限</dt><dd>${(q.valid_to||body.valid_to||'').replace('T',' ').slice(0,19)}</dd>
+      </dl>`);
+    toast('レート提示完了', 'success');
+  } catch(e) { toast('提示エラー: ' + e.message, 'error'); }
+}
+async function doFxListRates() {
+  const from = document.getElementById('fxListFrom').value.trim().toUpperCase();
+  const to = document.getElementById('fxListTo').value.trim().toUpperCase();
+  if (!/^[A-Z]{3}$/.test(from) || !/^[A-Z]{3}$/.test(to)) { toast('通貨ペアを正しく入力してください', 'error'); return; }
+  const box = document.getElementById('fxRatesList');
+  try {
+    const r = await api('GET', `/api/fx/rates?from=${from}&to=${to}`);
+    if (r.error) { box.innerHTML = `<span class="text-red-500">取得エラー: ${r.reason_code || r.error}</span>`; return; }
+    const quotes = r.quotes || [];
+    if (!quotes.length) { box.innerHTML = `<span class="text-gray-400">${from}→${to} の提示レートはありません。</span>`; return; }
+    box.innerHTML = `<table class="w-full text-xs">
+      <thead><tr class="border-b border-gray-200 text-left text-gray-400">
+        <th class="pb-1 font-medium">FXP</th><th class="pb-1 font-medium text-right">レート</th>
+        <th class="pb-1 font-medium text-right">最小/最大</th><th class="pb-1 font-medium">期限</th><th class="pb-1"></th>
+      </tr></thead>
+      <tbody class="divide-y divide-gray-100">${quotes.map(q => `<tr>
+        <td class="py-1">${bankName(q.fxp_bank_id)}</td>
+        <td class="py-1 text-right mono">${fxRateHuman(q.rate)}</td>
+        <td class="py-1 text-right mono">${q.min_amount||0} / ${q.max_amount==null?'∞':q.max_amount}</td>
+        <td class="py-1 text-[10px] text-gray-400">${(q.valid_to||'').replace('T',' ').slice(0,16)}</td>
+        <td class="py-1 text-right"><button class="text-[11px] text-red-500 hover:text-red-700" onclick="doFxWithdraw('${q.quote_id}')"><i class="fa-solid fa-trash"></i></button></td>
+      </tr>`).join('')}</tbody></table>`;
+  } catch(e) { box.innerHTML = `<span class="text-red-500">取得エラー: ${e.message}</span>`; }
+}
+async function doFxWithdraw(quoteId) {
+  if (!confirm(`Quote ${quoteId} を取り下げますか？`)) return;
+  try {
+    const r = await api('DELETE', `/api/fx/rates/${quoteId}`);
+    if (r.error) { toast('取り下げエラー: ' + (r.reason_code || r.error), 'error'); return; }
+    toast('レートを取り下げました', 'success');
+    doFxListRates();
+  } catch(e) { toast('取り下げエラー: ' + e.message, 'error'); }
+}
+async function doFxQuote() {
+  const from = document.getElementById('fxQFrom').value.trim().toUpperCase();
+  const to = document.getElementById('fxQTo').value.trim().toUpperCase();
+  const amount = parseAmount(document.getElementById('fxQAmount').value);
+  const denomination = document.getElementById('fxQDenom').value;
+  const hops = parseInt(document.getElementById('fxQHops').value, 10);
+  if (!/^[A-Z]{3}$/.test(from) || !/^[A-Z]{3}$/.test(to)) { toast('通貨を正しく入力してください', 'error'); return; }
+  if (!(amount > 0)) { toast('金額を正の整数で入力してください', 'error'); return; }
+  try {
+    const r = await api('POST', '/api/fx/quote', { from_currency: from, to_currency: to, amount, denomination, max_bridge_hops: isNaN(hops) ? 1 : hops });
+    if (r.error) {
+      document.getElementById('fxResult').innerHTML = card('価格照会結果', `<div class="text-red-500 text-sm"><i class="fa-solid fa-xmark mr-1"></i> 経路なし: ${r.reason_code || r.error}</div>`);
+      return;
+    }
+    const route = r.route || {};
+    const hopRows = (route.hops || []).map((h, i) => `<tr>
+      <td class="py-1 text-gray-400">${i+1}</td>
+      <td class="py-1">${bankName(h.fxp_bank_id)}</td>
+      <td class="py-1 mono">${h.from_currency}→${h.to_currency}</td>
+      <td class="py-1 text-right mono">${(h.amount_in||0).toLocaleString()} → ${(h.amount_out||0).toLocaleString()}</td>
+    </tr>`).join('');
+    document.getElementById('fxResult').innerHTML = card('最良経路', `
+      <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm mb-3">
+        <dt class="text-gray-400">結果</dt><dd>${r.result || '-'}</dd>
+        <dt class="text-gray-400">支払額</dt><dd class="mono">${(route.amount_from||0).toLocaleString()} ${route.from_currency}</dd>
+        <dt class="text-gray-400">受取額</dt><dd class="mono">${(route.amount_to||0).toLocaleString()} ${route.to_currency}</dd>
+        <dt class="text-gray-400">実効レート</dt><dd class="mono">${fxRateHuman(route.effective_rate)}</dd>
+        <dt class="text-gray-400">受付期限</dt><dd>${(route.expires_at||'').replace('T',' ').slice(0,19)}</dd>
+      </dl>
+      <div class="text-xs text-gray-500 mb-1">経路内訳（${(route.hops||[]).length}ホップ）</div>
+      <table class="w-full text-xs"><thead><tr class="border-b border-gray-200 text-left text-gray-400">
+        <th class="pb-1 font-medium">#</th><th class="pb-1 font-medium">FXP</th><th class="pb-1 font-medium">通貨</th><th class="pb-1 font-medium text-right">in→out</th>
+      </tr></thead><tbody class="divide-y divide-gray-100">${hopRows}</tbody></table>`);
+    toast('価格照会完了', 'success');
+  } catch(e) {
+    document.getElementById('fxResult').innerHTML = card('価格照会結果', `<div class="text-red-500 text-sm"><i class="fa-solid fa-xmark mr-1"></i> 経路なし: ${e.message}</div>`);
+  }
+}
+async function doFxStatus() {
+  const gtid = document.getElementById('fxStatusGtid').value.trim();
+  if (!gtid) { toast('GTIDを入力してください', 'error'); return; }
+  try {
+    const r = await api('GET', `/api/fx/transfers/${encodeURIComponent(gtid)}`);
+    if (r.error) {
+      document.getElementById('fxResult').innerHTML = card('FX送金ステータス', `<div class="text-red-500 text-sm"><i class="fa-solid fa-xmark mr-1"></i> ${r.reason_code || r.error}</div>`);
+      return;
+    }
+    const legRows = (r.legs || []).map(l => `<tr>
+      <td class="py-1 mono text-[10px]">${l.leg_id}</td><td class="py-1">${l.role}</td>
+      <td class="py-1">${bankName(l.bank_id)}</td>
+      <td class="py-1 text-right mono">${(l.amount_value||0).toLocaleString()} ${l.leg_currency}</td>
+      <td class="py-1">${l.state}</td>
+    </tr>`).join('');
+    const lockRows = (r.leg_locks || []).map(l => `<tr>
+      <td class="py-1">${l.leg_index}</td><td class="py-1">${l.currency}</td>
+      <td class="py-1 text-right mono">${(l.amount||0).toLocaleString()}</td>
+      <td class="py-1 text-[10px] text-gray-400">${(l.timelock||'').replace('T',' ').slice(0,19)}</td>
+      <td class="py-1">${l.state}</td>
+    </tr>`).join('');
+    document.getElementById('fxResult').innerHTML = card('FX送金ステータス', `
+      <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm mb-3">
+        <dt class="text-gray-400">GTID</dt><dd class="mono">${r.gtid}</dd>
+        <dt class="text-gray-400">FXステータス</dt><dd>${r.status}</dd>
+        <dt class="text-gray-400">GTID状態</dt><dd>${r.gtid_state || '-'}</dd>
+        <dt class="text-gray-400">金額</dt><dd class="mono">${(r.amount_from||0).toLocaleString()} ${r.from_currency} → ${(r.amount_to||0).toLocaleString()} ${r.to_currency}</dd>
+        <dt class="text-gray-400">実効レート</dt><dd class="mono">${fxRateHuman(r.effective_rate)}</dd>
+        ${r.hashlock ? `<dt class="text-gray-400">Hashlock</dt><dd class="mono text-[10px] break-all">${r.hashlock}</dd>` : ''}
+      </dl>
+      <div class="text-xs text-gray-500 mb-1">レッグ</div>
+      <table class="w-full text-xs mb-3"><thead><tr class="border-b border-gray-200 text-left text-gray-400">
+        <th class="pb-1 font-medium">Leg</th><th class="pb-1 font-medium">役割</th><th class="pb-1 font-medium">銀行</th><th class="pb-1 font-medium text-right">金額</th><th class="pb-1 font-medium">状態</th>
+      </tr></thead><tbody class="divide-y divide-gray-100">${legRows || '<tr><td colspan="5" class="py-2 text-gray-400">なし</td></tr>'}</tbody></table>
+      ${lockRows ? `<div class="text-xs text-gray-500 mb-1">HTLCロック</div>
+      <table class="w-full text-xs"><thead><tr class="border-b border-gray-200 text-left text-gray-400">
+        <th class="pb-1 font-medium">Idx</th><th class="pb-1 font-medium">通貨</th><th class="pb-1 font-medium text-right">金額</th><th class="pb-1 font-medium">timelock</th><th class="pb-1 font-medium">状態</th>
+      </tr></thead><tbody class="divide-y divide-gray-100">${lockRows}</tbody></table>` : ''}`);
+    toast('ステータス照会完了', 'success');
+  } catch(e) {
+    document.getElementById('fxResult').innerHTML = card('FX送金ステータス', `<div class="text-red-500 text-sm"><i class="fa-solid fa-xmark mr-1"></i> ${e.message}</div>`);
+  }
+}
+
+// ========== Credit Notification ==========
+async function renderCreditNotify() {
+  document.getElementById('app').innerHTML = card('入金結果通知モニター', `
+    <p class="text-xs text-gray-400 mb-4">送金完了時に被仕向銀行へ送信される入金結果通知の状況を表示します。</p>
+    <div id="cnList" class="text-sm text-gray-400">読込中...</div>
+  `);
+  const txRes = await api('GET', '/api/transactions?limit=100');
+  const settled = (txRes.transactions || []).filter(t => t.state === 'SETTLED');
+  const el = document.getElementById('cnList');
+  if (!el) return;
+  if (!settled.length) { el.innerHTML = '<p class="text-gray-400 py-4">決済完了取引がありません</p>'; return; }
+  el.innerHTML = `<div class="overflow-x-auto"><table class="w-full text-sm"><thead><tr class="border-b border-gray-200 text-left">
+    <th class="pb-2 text-xs text-gray-400 font-medium">取引ID</th>
+    <th class="pb-2 text-xs text-gray-400 font-medium">被仕向銀行</th>
+    <th class="pb-2 text-xs text-gray-400 font-medium text-right">金額</th>
+    <th class="pb-2 text-xs text-gray-400 font-medium">決済状態</th>
+    <th class="pb-2 text-xs text-gray-400 font-medium">通知状態</th>
+    <th class="pb-2 text-xs text-gray-400 font-medium">決済日時</th>
+  </tr></thead><tbody class="divide-y divide-gray-100">${settled.slice(0, 50).map(t => `<tr class="hover:bg-gray-50">
+    <td class="py-2 mono text-[11px]">${t.txid}</td>
+    <td class="py-2 text-xs">${bankName(t.payee_bank_id)}</td>
+    <td class="py-2 text-right">${fmtAmt(t.amount_value)}</td>
+    <td class="py-2">${badge(t.state)}</td>
+    <td class="py-2"><span class="inline-block rounded-full px-2.5 py-0.5 text-[11px] font-medium bg-emerald-100 text-emerald-700"><i class="fa-solid fa-check mr-0.5"></i> 送信済</span></td>
+    <td class="py-2 text-[11px] text-gray-400">${fmtDate(t.updated_at || t.created_at)}</td>
+  </tr>`).join('')}</tbody></table></div>`;
+}
+
+// ========== QR Code ==========
+async function renderQrCode() {
+  document.getElementById('app').innerHTML = card('QRコード送金', `
+    ${subnav('qrNav', [{key:'generate',label:'QR生成'},{key:'pay',label:'QR支払'}])}
+    <div id="qrTab"></div>
+  `) + '<div id="qrResult"></div>';
+  bindSubnav('qrNav', renderQrTab);
+  renderQrTab('generate');
+}
+function renderQrTab(tab) {
+  const el = document.getElementById('qrTab');
+  if (tab === 'generate') {
+    el.innerHTML = `<div class="max-w-lg space-y-3">
+      <div><label class="block text-xs text-gray-400 mb-1">QR種別</label>
+        <select id="qrType" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm">
+          <option value="STATIC">STATIC（固定）</option><option value="DYNAMIC">DYNAMIC（一回限り）</option>
+        </select></div>
+      <div><label class="block text-xs text-gray-400 mb-1">受取口座番号（10桁）</label>
+        <input type="text" id="qrAcct" maxlength="10" placeholder="例: 0010000001" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm font-mono focus:ring-1 focus:ring-brand-500 focus:border-brand-500"></div>
+      <div><label class="block text-xs text-gray-400 mb-1">金額（円・任意）</label>
+        <input type="number" id="qrAmt" placeholder="金額を指定（任意）" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-1 focus:ring-brand-500 focus:border-brand-500"></div>
+      <div><label class="block text-xs text-gray-400 mb-1">メモ（任意）</label>
+        <input type="text" id="qrMemo" placeholder="店舗名や摘要" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-1 focus:ring-brand-500 focus:border-brand-500"></div>
+      <button class="bg-brand-500 hover:bg-brand-600 text-white px-5 py-2 rounded-md text-sm transition-colors" onclick="doQrGenerate()"><i class="fa-solid fa-qrcode mr-1"></i> QR生成</button>
+    </div>`;
+  } else {
+    el.innerHTML = `<div class="max-w-lg space-y-3">
+      <div><label class="block text-xs text-gray-400 mb-1">QR参照コード</label>
+        <input type="text" id="qrPayRef" placeholder="QR-..." class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm font-mono focus:ring-1 focus:ring-brand-500 focus:border-brand-500"></div>
+      <div><label class="block text-xs text-gray-400 mb-1">支払口座番号（10桁）</label>
+        <input type="text" id="qrPayAcct" maxlength="10" placeholder="例: 0020000001" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm font-mono focus:ring-1 focus:ring-brand-500 focus:border-brand-500"></div>
+      <div><label class="block text-xs text-gray-400 mb-1">金額（円・STATICの場合必須）</label>
+        <input type="number" id="qrPayAmt" placeholder="金額" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-1 focus:ring-brand-500 focus:border-brand-500"></div>
+      <button class="bg-brand-500 hover:bg-brand-600 text-white px-5 py-2 rounded-md text-sm transition-colors" onclick="withSubmitGuard(event, () => doQrPay())"><i class="fa-solid fa-credit-card mr-1"></i> QR支払実行</button>
+    </div>`;
+  }
+}
+async function doQrGenerate() {
+  const acct = document.getElementById('qrAcct')?.value.trim();
+  if (!acct || acct.length !== 10) { toast('口座番号を10桁で入力してください', 'error'); return; }
+  const body = { type: document.getElementById('qrType').value, payee_account_id: acct, payee_bank_id: acct.slice(0,3) };
+  const amtRaw = document.getElementById('qrAmt')?.value.trim();
+  if (amtRaw) {
+    const amt = parseAmount(amtRaw);
+    if (!amt || amt <= 0) { toast('金額は小数を含まない正しい整数で入力してください（空欄なら金額未指定のQR）', 'error'); return; }
+    body.amount = amt;
+  }
+  const memo = document.getElementById('qrMemo')?.value.trim();
+  if (memo) body.purpose = memo;
+  try {
+    const r = await api('POST', '/api/qr/generate', body);
+    document.getElementById('qrResult').innerHTML = card('QR生成結果', `
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
+            <dt class="text-gray-400">QR参照</dt><dd class="mono">${r.qr_ref||'-'}</dd>
+            <dt class="text-gray-400">種別</dt><dd>${r.qr_type||'-'}</dd>
+            <dt class="text-gray-400">口座</dt><dd class="mono">${acct}</dd>
+            ${r.amount_value ? `<dt class="text-gray-400">金額</dt><dd>${fmtAmt(r.amount_value)}</dd>` : ''}
+          </dl>
+        </div>
+        <div class="flex items-center justify-center bg-gray-50 rounded-lg p-4">
+          <div id="qrCanvas"></div>
+        </div>
+      </div>`);
+    new QRCode(document.getElementById('qrCanvas'), { text: r.qr_ref, width: 160, height: 160, correctLevel: QRCode.CorrectLevel.M });
+    toast('QRコード生成完了', 'success');
+  } catch(e) { toast('QR生成エラー: ' + e.message, 'error'); }
+}
+async function doQrPay() {
+  const ref = document.getElementById('qrPayRef')?.value.trim();
+  const acct = document.getElementById('qrPayAcct')?.value.trim();
+  if (!ref) { toast('QR参照コードを入力してください', 'error'); return; }
+  if (!acct || acct.length !== 10) { toast('支払口座番号を10桁で入力してください', 'error'); return; }
+  const body = { qr_ref: ref, payer_account_id: acct, payer_bank_id: acct.slice(0,3), idempotency_key: uuid() };
+  const amtRaw = document.getElementById('qrPayAmt')?.value.trim();
+  if (amtRaw) {
+    const amt = parseAmount(amtRaw);
+    if (!amt || amt <= 0) { toast('金額は小数を含まない正しい整数で入力してください', 'error'); return; }
+    body.amount = amt;
+  }
+  try {
+    const r = await api('POST', '/api/qr/pay', body);
+    document.getElementById('qrResult').innerHTML = card('QR支払結果', `
+      <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
+        <dt class="text-gray-400">取引ID</dt><dd class="mono">${r.txid||'-'}</dd>
+        <dt class="text-gray-400">状態</dt><dd>${badge(r.state||r.result||'-')}</dd>
+      </dl>`);
+    toast('QR支払完了', 'success');
+  } catch(e) { toast('QR支払エラー: ' + e.message, 'error'); }
+}
+
+// ========== Cross-Border ==========
+async function renderCrossBorder() {
+  document.getElementById('app').innerHTML = card('クロスボーダー送金', `
+    ${subnav('cbNav', [{key:'send',label:'送金'},{key:'list',label:'取引一覧'}])}
+    <div id="cbTab"></div>
+  `) + '<div id="cbResult"></div>';
+  bindSubnav('cbNav', renderCbTab);
+  renderCbTab('send');
+}
+function renderCbTab(tab) {
+  const el = document.getElementById('cbTab');
+  if (tab === 'send') {
+    const bankOpts = banks.map(b => `<option value="${b.bank_id}">${esc(b.bank_name)} (${b.bank_id})</option>`).join('');
+    el.innerHTML = `<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div class="space-y-3">
+        <h4 class="text-xs font-medium text-gray-500 uppercase tracking-wider"><i class="fa-solid fa-arrow-up-from-bracket mr-1"></i> 仕向（送金人）</h4>
+        <div><label class="block text-xs text-gray-400 mb-1">銀行</label><select id="cbPayerBank" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm">${bankOpts}</select></div>
+        <div><label class="block text-xs text-gray-400 mb-1">口座</label><select id="cbPayerAcct" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"><option>読込中...</option></select></div>
+        <div><label class="block text-xs text-gray-400 mb-1">送金人名（FATF R.16）</label><input type="text" id="cbPayerName" placeholder="Full name in English" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"></div>
+        <div><label class="block text-xs text-gray-400 mb-1">送金人住所（FATF R.16）</label><input type="text" id="cbPayerAddr" placeholder="例: 1-1 Marunouchi, Chiyoda-ku, Tokyo" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"></div>
+      </div>
+      <div class="space-y-3">
+        <h4 class="text-xs font-medium text-gray-500 uppercase tracking-wider"><i class="fa-solid fa-arrow-down-to-bracket mr-1"></i> 被仕向（受取人）</h4>
+        <div><label class="block text-xs text-gray-400 mb-1">国外銀行BIC (SWIFT)</label><input type="text" id="cbPayeeBic" placeholder="例: CHASUS33" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm font-mono"></div>
+        <div><label class="block text-xs text-gray-400 mb-1">受取口座(IBAN等)</label><input type="text" id="cbPayeeAcct" placeholder="例: US123456789" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm font-mono"></div>
+        <div><label class="block text-xs text-gray-400 mb-1">受取人名（FATF R.16）</label><input type="text" id="cbPayeeName" placeholder="Full name in English" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"></div>
+      </div>
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+      <div><label class="block text-xs text-gray-400 mb-1">金額</label><input type="number" id="cbAmt" value="100000" step="0.01" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"></div>
+      <div><label class="block text-xs text-gray-400 mb-1">通貨</label><select id="cbCur" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"><option value="JPY">JPY</option><option value="USD">USD</option><option value="EUR">EUR</option></select></div>
+      <div><label class="block text-xs text-gray-400 mb-1">目的</label><select id="cbPurpose" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"><option value="TRADE">貿易決済</option><option value="REMITTANCE">送金</option><option value="INVESTMENT">投資</option></select></div>
+    </div>
+    <button class="mt-6 bg-brand-500 hover:bg-brand-600 text-white px-5 py-2 rounded-md text-sm transition-colors" onclick="withSubmitGuard(event, () => doCrossBorderSend())"><i class="fa-solid fa-earth-americas mr-1"></i> クロスボーダー送金実行</button>`;
+    loadAccounts('cbPayerBank', 'cbPayerAcct');
+    document.getElementById('cbPayerBank').onchange = () => loadAccounts('cbPayerBank', 'cbPayerAcct');
+  } else {
+    el.innerHTML = '<div id="cbList" class="text-sm text-gray-400">読込中...</div>';
+    loadCbList();
+  }
+}
+async function doCrossBorderSend() {
+  const payerBankId = document.getElementById('cbPayerBank').value;
+  const payerAcct = document.getElementById('cbPayerAcct')?.value;
+  const payeeBic = document.getElementById('cbPayeeBic')?.value.trim().toUpperCase();
+  const payeeAcct = document.getElementById('cbPayeeAcct')?.value.trim();
+  const payerAddr = document.getElementById('cbPayerAddr')?.value.trim();
+  if (!payerAcct || !payeeBic || !payeeAcct || !payerAddr) { toast('全項目を入力してください（送金人住所含む）', 'error'); return; }
+  // BICの5〜6文字目を相手国コードとして使用 (例: CHASUS33 → US)
+  const beneficiaryCountry = payeeBic.length >= 6 ? payeeBic.substring(4, 6) : 'US';
+  const payerBank = banks.find(b => b.bank_id === payerBankId) || { bank_name: payerBankId, bank_id: payerBankId };
+  const foreignCur = document.getElementById('cbCur').value;
+  const foreignAmt = parseCurrencyAmount(document.getElementById('cbAmt').value, foreignCur);
+  const maxDecimals = CURRENCY_DECIMAL_PLACES[foreignCur] ?? 0;
+  if (!foreignAmt || foreignAmt <= 0) {
+    toast(`金額は${foreignCur}として正しい形式（小数点以下${maxDecimals}桁まで）で入力してください`, 'error');
+    return;
+  }
+  try {
+    const r = await api('POST', '/api/cross-border/send', {
+      cb_txid: 'CB-' + uuid(),
+      payer_bank_id: payerBankId,
+      payer_account_id: payerAcct,
+      foreign_fps_id: payeeBic,
+      foreign_bank_bic: payeeBic,
+      foreign_account_id: payeeAcct,
+      foreign_currency: foreignCur,
+      foreign_amount: foreignAmt,
+      idempotency_key: uuid(),
+      fatf_data: {
+        originator: {
+          name: document.getElementById('cbPayerName')?.value || 'N/A',
+          account_id: payerAcct,
+          address: payerAddr,
+        },
+        beneficiary: {
+          name: document.getElementById('cbPayeeName')?.value || 'N/A',
+          account_id: payeeAcct,
+        },
+        ordering_institution: {
+          bank_id: payerBankId,
+          bank_name: payerBank.bank_name,
+          country: 'JP',
+        },
+        beneficiary_institution: {
+          bank_id: payeeBic,
+          bank_name: payeeBic,
+          country: beneficiaryCountry,
+        },
+        is_cross_border: true,
+        fatf16_applicable: true,
+      },
+    });
+    document.getElementById('cbResult').innerHTML = card('クロスボーダー送金結果', `
+      <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
+        <dt class="text-gray-400">CB取引ID</dt><dd class="mono">${r.cb_txid||'-'}</dd>
+        <dt class="text-gray-400">国内取引ID</dt><dd class="mono">${r.domestic_txid||'-'}</dd>
+        <dt class="text-gray-400">状態</dt><dd>${badge(r.status||'-')}</dd>
+      </dl>`);
+    toast('クロスボーダー送金受付完了', 'success');
+  } catch(e) { toast('送金エラー: ' + e.message, 'error'); }
+}
+async function loadCbList() {
+  const el = document.getElementById('cbList');
+  if (!el) return;
+  const txRes = await api('GET', '/api/transactions?limit=100');
+  const cbs = (txRes.transactions||[]).filter(t => t.lane === 'HIGH_VALUE' || t.is_cross_border);
+  if (!cbs.length) { el.innerHTML = '<p class="text-gray-400 py-4">クロスボーダー取引はありません</p>'; return; }
+  el.innerHTML = `<div class="overflow-x-auto"><table class="w-full text-sm"><thead><tr class="border-b border-gray-200 text-left">
+    <th class="pb-2 text-xs text-gray-400 font-medium">取引ID</th>
+    <th class="pb-2 text-xs text-gray-400 font-medium">レーン</th>
+    <th class="pb-2 text-xs text-gray-400 font-medium text-right">金額</th>
+    <th class="pb-2 text-xs text-gray-400 font-medium">状態</th>
+    <th class="pb-2 text-xs text-gray-400 font-medium">日時</th>
+  </tr></thead><tbody class="divide-y divide-gray-100">${cbs.map(t => `<tr class="hover:bg-gray-50 cursor-pointer" onclick="showTxTimeline('${t.txid}')">
+    <td class="py-2 mono text-[11px]">${t.txid}</td>
+    <td class="py-2 text-xs">${t.lane}</td>
+    <td class="py-2 text-right">${fmtAmt(t.amount_value)}</td>
+    <td class="py-2">${badge(t.state)}</td>
+    <td class="py-2 text-[11px] text-gray-400">${fmtDate(t.created_at)}</td>
+  </tr>`).join('')}</tbody></table></div>`;
+}
+
+// ========== EDI / Rich Data ==========
+async function renderEdi() {
+  document.getElementById('app').innerHTML = card('EDI/リッチデータ', `
+    ${subnav('ediNav', [{key:'register',label:'EDI登録'},{key:'search',label:'検索'},{key:'richdata',label:'リッチデータ'}])}
+    <div id="ediTab"></div>
+  `) + '<div id="ediResult"></div>';
+  bindSubnav('ediNav', renderEdiTab);
+  renderEdiTab('register');
+}
+function renderEdiTab(tab) {
+  const el = document.getElementById('ediTab');
+  if (tab === 'register') {
+    el.innerHTML = `<div class="max-w-lg space-y-3">
+      <div><label class="block text-xs text-gray-400 mb-1">取引ID</label>
+        <input type="text" id="ediTxid" placeholder="TX-..." class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm font-mono focus:ring-1 focus:ring-brand-500 focus:border-brand-500"></div>
+      <div><label class="block text-xs text-gray-400 mb-1">請求書番号</label>
+        <input type="text" id="ediInvoice" placeholder="INV-2026-001" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-1 focus:ring-brand-500 focus:border-brand-500"></div>
+      <div><label class="block text-xs text-gray-400 mb-1">摘要</label>
+        <input type="text" id="ediDesc" placeholder="商品代金" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-1 focus:ring-brand-500 focus:border-brand-500"></div>
+      <button class="bg-brand-500 hover:bg-brand-600 text-white px-5 py-2 rounded-md text-sm transition-colors" onclick="doEdiRegister()"><i class="fa-solid fa-file-invoice mr-1"></i> EDI登録</button>
+    </div>`;
+  } else if (tab === 'search') {
+    el.innerHTML = `<div class="max-w-lg space-y-3">
+      <div><label class="block text-xs text-gray-400 mb-1">取引IDで検索</label>
+        <div class="flex gap-2">
+          <input type="text" id="ediSearchTxid" placeholder="TX-..." class="flex-1 border border-gray-300 rounded-md px-3 py-2 text-sm font-mono focus:ring-1 focus:ring-brand-500 focus:border-brand-500">
+          <button class="bg-brand-500 hover:bg-brand-600 text-white px-4 py-2 rounded-md text-sm transition-colors" onclick="doEdiSearch()"><i class="fa-solid fa-search"></i></button>
+        </div>
+      </div>
+      <div><label class="block text-xs text-gray-400 mb-1">EDI参照コードで検索</label>
+        <div class="flex gap-2">
+          <input type="text" id="ediSearchRef" placeholder="EDI-..." class="flex-1 border border-gray-300 rounded-md px-3 py-2 text-sm font-mono focus:ring-1 focus:ring-brand-500 focus:border-brand-500">
+          <button class="bg-brand-500 hover:bg-brand-600 text-white px-4 py-2 rounded-md text-sm transition-colors" onclick="doEdiSearchByRef()"><i class="fa-solid fa-search"></i></button>
+        </div>
+      </div>
+    </div>`;
+  } else {
+    el.innerHTML = `<div class="max-w-lg space-y-3">
+      <div><label class="block text-xs text-gray-400 mb-1">取引IDで検索</label>
+        <div class="flex gap-2">
+          <input type="text" id="rdSearchTxid" placeholder="TX-..." class="flex-1 border border-gray-300 rounded-md px-3 py-2 text-sm font-mono focus:ring-1 focus:ring-brand-500 focus:border-brand-500">
+          <button class="bg-brand-500 hover:bg-brand-600 text-white px-4 py-2 rounded-md text-sm transition-colors" onclick="doRdSearch()"><i class="fa-solid fa-search"></i></button>
+        </div>
+      </div>
+    </div>`;
+  }
+}
+async function doEdiRegister() {
+  const txid = document.getElementById('ediTxid')?.value.trim();
+  const invoice = document.getElementById('ediInvoice')?.value.trim();
+  if (!txid) { toast('取引IDを入力してください', 'error'); return; }
+  try {
+    const r = await api('POST', '/api/edi/register', { txid, invoice_number: invoice, description: document.getElementById('ediDesc')?.value, idempotency_key: uuid() });
+    document.getElementById('ediResult').innerHTML = card('EDI登録結果', `<dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
+      <dt class="text-gray-400">EDI参照</dt><dd class="mono">${r.edi_ref||'-'}</dd>
+      <dt class="text-gray-400">請求書番号</dt><dd>${invoice||'-'}</dd>
+    </dl>`);
+    toast('EDI登録完了', 'success');
+  } catch(e) { toast('EDI登録エラー: ' + e.message, 'error'); }
+}
+async function doEdiSearch() {
+  const txid = document.getElementById('ediSearchTxid')?.value.trim();
+  if (!txid) return;
+  try {
+    const r = await api('GET', `/api/edi/tx/${txid}`);
+    document.getElementById('ediResult').innerHTML = card('EDI検索結果', `<pre class="text-xs bg-gray-50 p-3 rounded overflow-x-auto">${JSON.stringify(r, null, 2)}</pre>`);
+  } catch(e) { toast('検索エラー: ' + e.message, 'error'); }
+}
+async function doEdiSearchByRef() {
+  const ref = document.getElementById('ediSearchRef')?.value.trim();
+  if (!ref) return;
+  try {
+    const r = await api('GET', `/api/edi/${ref}`);
+    document.getElementById('ediResult').innerHTML = card('EDI検索結果', `<pre class="text-xs bg-gray-50 p-3 rounded overflow-x-auto">${JSON.stringify(r, null, 2)}</pre>`);
+  } catch(e) { toast('検索エラー: ' + e.message, 'error'); }
+}
+async function doRdSearch() {
+  const txid = document.getElementById('rdSearchTxid')?.value.trim();
+  if (!txid) return;
+  try {
+    const r = await api('GET', `/api/richdata/tx/${txid}`);
+    document.getElementById('ediResult').innerHTML = card('リッチデータ検索結果', `<pre class="text-xs bg-gray-50 p-3 rounded overflow-x-auto">${JSON.stringify(r, null, 2)}</pre>`);
+  } catch(e) { toast('検索エラー: ' + e.message, 'error'); }
+}
+
+// ========== Sidebar toggle (mobile) ==========
+function openSidebar() {
+  document.getElementById('sidebar').classList.add('open');
+  document.getElementById('sidebarOverlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+function closeSidebar() {
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sidebarOverlay').classList.remove('open');
+  document.body.style.overflow = '';
+}
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.contains('open') ? closeSidebar() : openSidebar();
+}
+
+// ========== Init ==========
+document.querySelectorAll('.nav-btn').forEach(b => b.onclick = () => { closeSidebar(); renderPage(b.dataset.page); });
+renderPage('overview');
+</script>
+</body>
+</html>

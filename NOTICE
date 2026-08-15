@@ -1,0 +1,36 @@
+Zenith Coordinator
+Copyright (c) 2026 Zenith Coordinator contributors
+
+このリポジトリのソースコードは LICENSE ファイルに定める条件で提供される。
+`docs/disclosure/` 配下の文書は CC0 1.0 Universal により提供される。
+
+
+## 特許非係争の宣言
+
+著作権者は、本リポジトリに記載した技術思想の実施に対し、自己が現に保有し、
+または将来取得する特許権その他の知的財産権を行使しない。
+
+本宣言は、`docs/disclosure/CORE_DISCLOSURE.md` に記載した各実施形態および
+特許請求の範囲に記載した各構成を含む、本リポジトリの全体を対象とする。
+
+宣言日: 2026-08-11
+
+理由: CC0 1.0 Universal は第4条(a)において特許権および商標権を放棄の対象から
+明示的に除外している。また本リポジトリのソースコードが用いるライセンスには
+明示的な特許許諾条項がない。本宣言はこの範囲を補うものである。
+
+
+## Patent Non-Assertion Declaration
+
+The copyright holder will not assert any patent or other intellectual property
+right that they now hold or may later acquire against any implementation of the
+technical subject matter disclosed in this repository.
+
+This declaration covers the repository as a whole, including every embodiment
+and every claim set out in `docs/disclosure/CORE_DISCLOSURE.md`.
+
+Declared: 2026-08-11
+
+Rationale: CC0 1.0 Universal expressly excludes patent and trademark rights from
+its waiver (section 4(a)), and the source licence carries no express patent
+grant. This declaration closes that gap.
