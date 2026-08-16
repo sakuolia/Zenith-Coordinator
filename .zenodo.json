@@ -1,0 +1,47 @@
+{
+  "title": "Zenith Coordinator (ZC): A Traceable State-Machine Coordination Layer for Interbank Payments",
+  "description": "<p>Zenith Coordinator (ZC) is a reference implementation of a coordination layer that treats interbank payments as a fixed sequence of state transitions — Received &rarr; Decision &rarr; Execution Confirmation &rarr; Settled — and records every transition in an append-only, hash-chained FinalityLog. It runs end-to-end on TypeScript and Cloudflare Workers.</p><p>ZC does not replace any participant's core banking or account-management systems. Instead, it coordinates what happens \"between\" those systems, so that every party involved in a transaction — payer, payee, or supervising authority — can later be given the same explanation, referencing the same transaction ID, the same timestamps, and the same reason codes.</p><p>Design principles include: a single source of truth (the FinalityLog, from which derived views can always be rebuilt); strict separation between Decision and Execution; an irreversibility boundary at payee execution confirmation, with any later remedy handled as a separate reversal transaction; a prohibition on unexplainable states, with unresolved or inconsistent states always converging to a CASE; contractually fixed semantics for synchronous responses; no after-the-fact evidence; lanes defined by finality point and evidentiary contract rather than UX; sending-bank overdraft headroom managed as explicit state with no silent breach; crisis handling modeled as institutionalized state transitions rather than exceptions; and single-source-of-truth guarantees backed by a distributed consensus log that degrades to read-only under uncertainty.</p><p>The project also treats traditional payment rails (RTGS, DNS netting, domestic retail clearing, ISO 20022, FATF Recommendation 16) and newer primitives (hash-time-locked contracts, atomic multi-leg settlement) as peer lanes on a single shared state machine, rather than as separate systems bridged together.</p><p>This is an independent, personal project. It uses no confidential material of any kind and does not depict, represent, or reference any real organization, institution, system, or operational practice.</p>",
+  "creators": [
+    {
+      "name": "SAKUOLIA WORKS",
+      "affiliation": ""
+    }
+  ],
+  "license": "MIT",
+  "upload_type": "software",
+  "access_right": "open",
+  "language": "eng",
+  "keywords": [
+    "interbank-settlement",
+    "payments",
+    "payment-systems",
+    "state-machine",
+    "finality-log",
+    "audit-trail",
+    "hash-chain",
+    "distributed-consensus",
+    "settlement-finality",
+    "clearing",
+    "rtgs",
+    "dns-netting",
+    "iso-20022",
+    "htlc",
+    "hash-time-locked-contract",
+    "atomic-multi-leg-settlement",
+    "cross-border-payments",
+    "fintech",
+    "financial-infrastructure",
+    "cloudflare-workers",
+    "typescript",
+    "reference-implementation",
+    "open-source"
+  ],
+  "related_identifiers": [
+    {
+      "identifier": "https://github.com/sakuolia/Zenith-Coordinator",
+      "relation": "isSupplementTo",
+      "resource_type": "software"
+    }
+  ],
+  "notes": "Reference implementation / personal project. Uses no confidential material and does not represent any real organization or system."
+}
